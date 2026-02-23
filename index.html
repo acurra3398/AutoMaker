@@ -405,11 +405,13 @@
     BLUE_CLOSE: [
       { label: 'Start',           x: -49, y: -54 },
       { label: 'Shooting Pos',    x: -16, y: -19, shootPreset: { veloL: 1150, veloM: 1150, veloR: 1150, hoodL: 30, hoodM: 30, hoodR: 30, turret: 142, preAim: -90 } },
-      { label: 'Close Intake 1',  x:  -6, y: -45 },
-      { label: 'Close Intake 2',  x:  -5, y: -57 },
-      { label: 'Close Intake 3',  x:  -8, y: -49 },
+      { label: 'Close Intake 1',  x: -16, y: -37 },
+      { label: 'Close Intake 2',  x:  -5, y: -47 },
+      { label: 'Close Intake 3',  x:  -5, y: -60 },
       { label: 'Gate Intake',     x:  13, y: -49 },
-      { label: 'Far Gate Intake', x:  39, y: -46 },
+      { label: 'Gate Sweep',      x:  17, y: -51 },
+      { label: 'Far Gate Intake', x:  36, y: -45 },
+      { label: 'Cycle Mid',       x:  10, y: -30 },
     ],
     BLUE_FAR: [
       { label: 'Start',           x:  63, y:  -7 },
@@ -422,11 +424,13 @@
     RED_CLOSE: [
       { label: 'Start',           x: -49, y:  54 },
       { label: 'Shooting Pos',    x: -16, y:  19, shootPreset: { veloL: 1120, veloM: 1140, veloR: 1120, hoodL: 34, hoodM: 34, hoodR: 34, turret: 218, preAim: 90 } },
-      { label: 'Middle Intake 1', x:  12, y:  25 },
-      { label: 'Middle Intake 2', x:  12, y:  59 },
-      { label: 'Close Intake',    x:  -8, y:  49 },
-      { label: 'Gate Approach',   x:  19, y:  45 },
-      { label: 'Gate Area',       x:  14, y:  58 },
+      { label: 'Close Intake 1',  x: -16, y:  37 },
+      { label: 'Close Intake 2',  x:  -5, y:  47 },
+      { label: 'Close Intake 3',  x:  -5, y:  60 },
+      { label: 'Gate Intake',     x:  13, y:  49 },
+      { label: 'Gate Sweep',      x:  17, y:  51 },
+      { label: 'Far Gate Intake', x:  36, y:  45 },
+      { label: 'Cycle Mid',       x:  10, y:  30 },
     ],
     RED_FAR: [
       { label: 'Start',           x:  63, y:   7 },
@@ -1394,8 +1398,14 @@ ${pathBody}
     // Axis labels
     ctx.fillStyle = 'rgba(255,255,255,0.45)';
     ctx.font = '11px Arial';
-    ctx.fillText('+y', ...toC(2, 66)); ctx.fillText('-y', ...toC(2, -69));
-    ctx.fillText('+x', ...toC(60, 3)); ctx.fillText('-x', ...toC(-71, 3));
+    ctx.textAlign = 'center';
+    ctx.fillText('+y', W / 2, 14);
+    ctx.fillText('-y', W / 2, H - 6);
+    ctx.textAlign = 'left';
+    ctx.fillText('-x', 6, H / 2 - 4);
+    ctx.textAlign = 'right';
+    ctx.fillText('+x', W - 6, H / 2 - 4);
+    ctx.textAlign = 'left';
 
     const key = getKey();
 
