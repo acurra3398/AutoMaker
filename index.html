@@ -444,6 +444,7 @@
   const DRIVE_IN_PER_SEC_AT_2000 = 50;
   const RENDER_FLIP_X = true;
   const RENDER_FLIP_Y = true;
+  const FIELD_IMAGE_EXTRA_ROTATE_180 = true;
 
   const playback = {
     isPlaying: false,
@@ -1345,6 +1346,11 @@ ${pathBody}
       ctx.save();
       ctx.translate(RENDER_FLIP_X ? W : 0, RENDER_FLIP_Y ? H : 0);
       ctx.scale(RENDER_FLIP_X ? -1 : 1, RENDER_FLIP_Y ? -1 : 1);
+      if (FIELD_IMAGE_EXTRA_ROTATE_180) {
+        ctx.translate(W / 2, H / 2);
+        ctx.rotate(Math.PI);
+        ctx.translate(-W / 2, -H / 2);
+      }
       ctx.drawImage(fieldImg, 0, 0, W, H);
       ctx.restore();
       // Darken slightly so overlays read clearly
