@@ -440,7 +440,6 @@
   const FIELD_MIN = -72;
   const FIELD_MAX = 72;
   const FIELD_SIZE_IN = FIELD_MAX - FIELD_MIN;
-  const DOC_CENTER = 72;
   const ROBOT_BOX_SIZE_IN = 18;
   const DRIVE_IN_PER_SEC_AT_2000 = 50;
 
@@ -465,13 +464,8 @@
     return n.length > 0 ? n[0].toUpperCase() + n.slice(1) : 'MyAuto';
   }
 
-  function docToRr(v) {
-    return v - DOC_CENTER;
-  }
-
-  function rrToDoc(v) {
-    return v + DOC_CENTER;
-  }
+  function docToRr(v) { return v; }
+  function rrToDoc(v) { return v; }
 
   function mirrorMapY(y) {
     return y;
@@ -592,7 +586,7 @@
 
       const wpTitle = document.createElement('div');
       wpTitle.style.cssText = 'font-size:13px;color:#c8d8ee;margin-bottom:4px';
-      wpTitle.textContent = 'Waypoints (x, y) docs coords (0..144, center 72,72) — in order:';
+      wpTitle.textContent = 'Waypoints (x, y) Pose2d coords (-72..72, center 0,0) — in order:';
       wpSection.appendChild(wpTitle);
 
       const wpList = document.createElement('div');
@@ -638,7 +632,7 @@
       wpSection.style.marginTop = '10px';
       const wpTitle = document.createElement('div');
       wpTitle.style.cssText = 'font-size:13px;color:#c8d8ee;margin-bottom:4px';
-      wpTitle.textContent = 'Waypoints (x, y) docs coords (0..144, center 72,72) — in order:';
+      wpTitle.textContent = 'Waypoints (x, y) Pose2d coords (-72..72, center 0,0) — in order:';
       wpSection.appendChild(wpTitle);
       const wpList = document.createElement('div');
       wpList.className = 'waypoint-list';
