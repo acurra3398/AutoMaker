@@ -675,8 +675,15 @@
     } else if (type === 'Shoot') {
       const div = document.createElement('div');
       div.innerHTML = `
-        <label style="margin-top:4px"><input type="checkbox" class="p-antijam"> Use <code>AutonomousShootAntiJamCommand</code> instead of normal shoot</label>
+        <label>Mode:
+          <select class="p-shoot-mode">
+            <option value="all">Shoot All (<code>AutonomousShootCommand</code>)</option>
+            <option value="motif">Shoot in Motif Order (<code>AutonomousShootWithMotifCommand</code>)</option>
+          </select>
+        </label>
+        <label style="margin-top:4px"><input type="checkbox" class="p-antijam"> Use anti-jam variant</label>
         <label style="margin-top:6px"><input type="checkbox" class="p-spit"> Spit intake after shoot (WaitCommand 300ms + IntakeSpitCommand)</label>`;
+      div.querySelector('.p-shoot-mode').onchange = regenerate;
       div.querySelector('.p-antijam').onchange = regenerate;
       div.querySelector('.p-spit').onchange = regenerate;
       container.appendChild(div);
@@ -859,9 +866,15 @@
       return `.waitMilliseconds(${ms})`;
 
     } else if (type === 'Shoot') {
+      const mode = card.querySelector('.p-shoot-mode')?.value || 'all';
       const antiJam = card.querySelector('.p-antijam')?.checked;
       const spit    = card.querySelector('.p-spit')?.checked;
-      const cmd = antiJam ? 'new AutonomousShootAntiJamCommand()' : 'new AutonomousShootCommand()';
+      let cmd;
+      if (mode === 'motif') {
+        cmd = antiJam ? 'new AutonomousShootWithMotifAntiJamCommand()' : 'new AutonomousShootWithMotifCommand()';
+      } else {
+        cmd = antiJam ? 'new AutonomousShootAntiJamCommand()' : 'new AutonomousShootCommand()';
+      }
       if (spit) {
         return `.callback(() -> {\n${IND_CB}new SequentialCommandGroup(\n${IND_ARGS}${cmd},\n${IND_ARGS}new WaitCommand(300),\n${IND_ARGS}new IntakeSpitCommand()\n${IND_CB}).schedule();\n${IND_CHAIN}})`;
       }
@@ -922,14 +935,18 @@
 
     // Collect path segments from step cards
     const cards = document.querySelectorAll('.step-card');
-    let usesAntiJam = false, usesSpit = false;
+    let usesAntiJam = false, usesSpit = false, usesMotifShoot = false, usesMotifAntiJam = false;
     let usesIntakeStart = false, usesIntakeStop = false, usesIntakeCustom = false;
     const segments = [];
     cards.forEach(card => {
       const type = card.querySelector('.step-type').value;
       if (type === 'Shoot') {
-        if (card.querySelector('.p-antijam')?.checked) usesAntiJam = true;
-        if (card.querySelector('.p-spit')?.checked)    usesSpit    = true;
+        const mode = card.querySelector('.p-shoot-mode')?.value || 'all';
+        const antiJam = !!card.querySelector('.p-antijam')?.checked;
+        if (mode === 'motif' && antiJam) usesMotifAntiJam = true;
+        else if (mode === 'motif')       usesMotifShoot = true;
+        else if (antiJam)                usesAntiJam = true;
+        if (card.querySelector('.p-spit')?.checked) usesSpit = true;
       } else if (type === 'Intake') {
         const mode = card.querySelector('.p-intake-mode')?.value || 'start';
         if (mode === 'start')  usesIntakeStart = true;
@@ -959,6 +976,12 @@
     const antiJamImport = usesAntiJam
       ? 'import org.firstinspires.ftc.teamcode.blucru.common.commands.autonomousCommands.AutonomousShootAntiJamCommand;\n'
       : '';
+    const motifShootImport = usesMotifShoot
+      ? 'import org.firstinspires.ftc.teamcode.blucru.common.commands.autonomousCommands.AutonomousShootWithMotifCommand;\n'
+      : '';
+    const motifAntiJamImport = usesMotifAntiJam
+      ? 'import org.firstinspires.ftc.teamcode.blucru.common.commands.autonomousCommands.AutonomousShootWithMotifAntiJamCommand;\n'
+      : '';
     const spitImport = usesSpit
       ? 'import org.firstinspires.ftc.teamcode.blucru.common.subsytems.intake.IntakeSpitCommand;\n'
       : '';
@@ -980,7 +1003,7 @@ import com.seattlesolvers.solverslib.command.WaitCommand;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 
 import org.firstinspires.ftc.teamcode.blucru.common.commands.autonomousCommands.AutonomousShootCommand;
-${antiJamImport}${spitImport}${intakeStartImport}${intakeStopImport}${intakeCustomImport}import org.firstinspires.ftc.teamcode.blucru.common.commands.autonomousCommands.AutonomousTransferCommand;
+${antiJamImport}${motifShootImport}${motifAntiJamImport}${spitImport}${intakeStartImport}${intakeStopImport}${intakeCustomImport}import org.firstinspires.ftc.teamcode.blucru.common.commands.autonomousCommands.AutonomousTransferCommand;
 import org.firstinspires.ftc.teamcode.blucru.common.pathing.Path;
 import org.firstinspires.ftc.teamcode.blucru.common.pathing.SixWheelPIDPathBuilder;
 import org.firstinspires.ftc.teamcode.blucru.common.subsytems.outtake.shooter.shooterCommands.SetShooterVelocityIndependentCommand;
