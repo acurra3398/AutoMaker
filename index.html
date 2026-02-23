@@ -75,7 +75,53 @@
       margin-bottom: 8px;
     }
 
-    /* Step cards */
+    /* Two-column layout */
+    .page-layout {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+    }
+    .left-col {
+      flex: 1;
+      min-width: 0;
+    }
+    .right-col {
+      flex: 0 0 460px;
+    }
+    .canvas-sticky {
+      position: sticky;
+      top: 20px;
+    }
+    .canvas-sticky h2 {
+      margin: 0 0 8px 0;
+    }
+    #fieldCanvas {
+      border: 2px solid #485d97;
+      border-radius: 4px;
+      display: block;
+      background: #1a1a1a;
+    }
+    .field-legend {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #666;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+  /* Step cards */
     #steps { margin-top: 12px; }
     .step-card {
       border: 1px solid #b0b0b0;
@@ -162,6 +208,8 @@
   </style>
 </head>
 <body>
+<div class="page-layout">
+<div class="left-col">
 
 <h1>Deocde Robotics Auto Generator</h1>
 
@@ -227,6 +275,24 @@
   <pre><code id="output" class="language-java"></code></pre>
 </div>
 <button id="copyBtn" style="margin-top:10px">Copy to Clipboard</button>
+
+</div><!-- .left-col -->
+
+<div class="right-col">
+  <div class="canvas-sticky">
+    <h2>Field Preview</h2>
+    <canvas id="fieldCanvas" width="450" height="450"></canvas>
+    <div class="field-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#5e81ac;border:2px solid #fff"></div><span>Start</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#485d97;opacity:0.6"></div><span>Named point</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#88c0d0"></div><span>Drive step 1</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#a3be8c"></div><span>Drive step 2</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ebcb8b"></div><span>Turn</span></div>
+    </div>
+  </div>
+</div><!-- .right-col -->
+
+</div><!-- .page-layout -->
 
 <script>
   // ── Constants ──────────────────────────────────────────────────────────────
@@ -796,6 +862,196 @@ ${pathBody}
     const box = document.getElementById('output');
     box.textContent = code;
     Prism.highlightElement(box);
+    renderField();
+  }
+
+  // ── Field Visualizer ───────────────────────────────────────────────────────
+
+  const FIELD_COLORS = ['#88c0d0','#a3be8c','#d08770','#bf616a','#b48ead','#8fbcbb','#81a1c1'];
+
+  function renderField() {
+    const canvas = document.getElementById('fieldCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+
+    // Field coords: -72..72 on both axes, y increases upward.
+    // Canvas coords: (0,0) = top-left, y increases downward.
+    function toC(fx, fy) {
+      return [(fx + 72) / 144 * W, (72 - fy) / 144 * H];
+    }
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw alternating tiles (6×6 grid of 24" tiles)
+    for (let row = 0; row < 6; row++) {
+      for (let col = 0; col < 6; col++) {
+        const [cx, cy] = toC(-72 + col * 24, 72 - row * 24);
+        const tw = 24 / 144 * W, th = 24 / 144 * H;
+        ctx.fillStyle = (row + col) % 2 === 0 ? '#272727' : '#1f1f1f';
+        ctx.fillRect(cx, cy, tw + 0.5, th + 0.5);
+      }
+    }
+
+    // Tile grid lines
+    ctx.strokeStyle = '#383838';
+    ctx.lineWidth = 0.5;
+    for (let i = -72; i <= 72; i += 24) {
+      const [x1, y1] = toC(i, -72), [x2, y2] = toC(i, 72);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      const [x3, y3] = toC(-72, i), [x4, y4] = toC(72, i);
+      ctx.beginPath(); ctx.moveTo(x3, y3); ctx.lineTo(x4, y4); ctx.stroke();
+    }
+
+    // Center axes
+    ctx.strokeStyle = '#4a4a4a';
+    ctx.lineWidth = 1;
+    const [ax1, ay1] = toC(0, -72), [ax2, ay2] = toC(0, 72);
+    ctx.beginPath(); ctx.moveTo(ax1, ay1); ctx.lineTo(ax2, ay2); ctx.stroke();
+    const [ax3, ay3] = toC(-72, 0), [ax4, ay4] = toC(72, 0);
+    ctx.beginPath(); ctx.moveTo(ax3, ay3); ctx.lineTo(ax4, ay4); ctx.stroke();
+
+    // Field border
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, W - 2, H - 2);
+
+    // Axis labels
+    ctx.fillStyle = '#555';
+    ctx.font = '10px Arial';
+    ctx.fillText('+y', ...toC(2, 68));
+    ctx.fillText('-y', ...toC(2, -70));
+    ctx.fillText('+x', ...toC(62, 4));
+    ctx.fillText('-x', ...toC(-71, 4));
+
+    const key = getKey();
+
+    // Known points
+    (KNOWN_POINTS[key] || []).forEach(pt => {
+      const [cx, cy] = toC(pt.x, pt.y);
+      ctx.fillStyle = '#485d9766';
+      ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#888';
+      ctx.font = '9px Arial';
+      ctx.fillText(pt.label, cx + 7, cy + 3);
+    });
+
+    // Start pose
+    const pose = START_POSES[key];
+    let px = pose.x, py = pose.y;
+    {
+      const [cx, cy] = toC(px, py);
+      ctx.fillStyle = '#5e81ac';
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+      // Heading arrow: convention 0=up (+y), CW positive (compass-like)
+      // Canvas angle (from +x, CW): (heading_deg - 90) * π/180
+      const hRad = (pose.heading - 90) * Math.PI / 180;
+      const aLen = 18;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + aLen * Math.cos(hRad), cy + aLen * Math.sin(hRad));
+      ctx.stroke();
+
+      ctx.fillStyle = '#aaa';
+      ctx.font = 'bold 9px Arial';
+      ctx.fillText('S', cx - 3, cy + 3);
+    }
+
+    // Draw path steps
+    let colorIdx = 0;
+    document.querySelectorAll('.step-card').forEach((card, i) => {
+      const type = card.querySelector('.step-type').value;
+      const color = FIELD_COLORS[colorIdx % FIELD_COLORS.length];
+
+      if (type === 'Drive' || type === 'Drive + Turn') {
+        const wpRows = card.querySelectorAll('.waypoint-row');
+        const pts = [];
+        wpRows.forEach(row => {
+          const x = parseFloat(row.querySelector('.wp-x').value);
+          const y = parseFloat(row.querySelector('.wp-y').value);
+          if (!isNaN(x) && !isNaN(y)) pts.push([x, y]);
+        });
+
+        if (pts.length > 0) {
+          // Path line from previous position through all waypoints
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 2.5;
+          ctx.setLineDash([]);
+          ctx.beginPath();
+          ctx.moveTo(...toC(px, py));
+          pts.forEach(([fx, fy]) => ctx.lineTo(...toC(fx, fy)));
+          ctx.stroke();
+
+          // Arrowhead at final waypoint
+          const prev = pts.length > 1 ? pts[pts.length - 2] : [px, py];
+          const last = pts[pts.length - 1];
+          drawArrow(ctx, toC(prev[0], prev[1]), toC(last[0], last[1]), color);
+
+          // Waypoint dots
+          pts.forEach(([fx, fy]) => {
+            const [cx, cy] = toC(fx, fy);
+            ctx.fillStyle = color;
+            ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fill();
+          });
+
+          // Step number label near last waypoint
+          const [lx, ly] = toC(last[0], last[1]);
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 10px Arial';
+          ctx.fillText(i + 1, lx + 6, ly - 3);
+
+          px = last[0]; py = last[1];
+        }
+
+        // Turn indicator for Drive+Turn
+        if (type === 'Drive + Turn') {
+          const [cx, cy] = toC(px, py);
+          ctx.strokeStyle = '#ebcb8b';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath();
+          ctx.arc(cx, cy, 14, -Math.PI * 0.5, Math.PI * 0.3);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        colorIdx++;
+
+      } else if (type === 'Turn') {
+        const [cx, cy] = toC(px, py);
+        const angleDeg = parseFloat(card.querySelector('.p-turn-angle')?.value || '0');
+        ctx.strokeStyle = '#ebcb8b';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        const sweep = Math.min(Math.abs(angleDeg), 270) * Math.PI / 180;
+        ctx.arc(cx, cy, 14, -Math.PI / 2, -Math.PI / 2 + (angleDeg >= 0 ? sweep : -sweep), angleDeg < 0);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#ebcb8b';
+        ctx.font = '9px Arial';
+        ctx.fillText(`T${i + 1}(${angleDeg}°)`, cx + 17, cy - 2);
+        colorIdx++;
+      }
+      // Wait / Shoot / Transfer / Aim Turret: no movement, skip
+    });
+  }
+
+  function drawArrow(ctx, [x1, y1], [x2, y2], color) {
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    const len = 10;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - len * Math.cos(angle - Math.PI / 6), y2 - len * Math.sin(angle - Math.PI / 6));
+    ctx.lineTo(x2 - len * Math.cos(angle + Math.PI / 6), y2 - len * Math.sin(angle + Math.PI / 6));
+    ctx.closePath();
+    ctx.fill();
   }
 
   // ── Event wiring ───────────────────────────────────────────────────────────
@@ -813,6 +1069,7 @@ ${pathBody}
 
   // Initial render
   regenerate();
+  renderField();
 </script>
 </body>
 </html>
