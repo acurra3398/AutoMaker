@@ -120,6 +120,30 @@
       border-radius: 50%;
       flex-shrink: 0;
     }
+    .playback-controls {
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid #c5cfe6;
+      border-radius: 6px;
+      background: #eef2fb;
+      display: grid;
+      gap: 8px;
+    }
+    .playback-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .playback-time {
+      font-size: 12px;
+      color: #2f3c66;
+      min-width: 90px;
+    }
+    #playbackSeek {
+      width: 100%;
+      margin: 0;
+    }
 
   /* Step cards */
     #steps { margin-top: 12px; }
@@ -291,6 +315,22 @@
       <div class="legend-item"><div class="legend-dot" style="background:#d08770"></div><span>↺ Transfer</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:#ebcb8b"></div><span>◎ Aim</span></div>
     </div>
+    <div class="playback-controls">
+      <div class="playback-row">
+        <button id="playPauseBtn" type="button">Play</button>
+        <button id="resetPlaybackBtn" type="button">Reset</button>
+        <label style="margin:0">Speed:
+          <select id="playbackSpeed" style="margin-top:0">
+            <option value="0.5">0.5x</option>
+            <option value="1" selected>1.0x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2.0x</option>
+          </select>
+        </label>
+        <span id="playbackTime" class="playback-time">0.00s / 0.00s</span>
+      </div>
+      <input id="playbackSeek" type="range" min="0" max="1000" value="0">
+    </div>
   </div>
 </div><!-- .right-col -->
 
@@ -352,6 +392,22 @@
     ],
   };
 
+  const FIELD_MIN = -72;
+  const FIELD_MAX = 72;
+  const FIELD_SIZE_IN = FIELD_MAX - FIELD_MIN;
+  const ROBOT_BOX_SIZE_IN = 18;
+  const DRIVE_IN_PER_SEC_AT_2000 = 50;
+
+  const playback = {
+    isPlaying: false,
+    speed: 1,
+    tMs: 0,
+    durationMs: 0,
+    lastTs: 0,
+    segments: [],
+    rafId: null
+  };
+
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   function getKey() {
@@ -361,6 +417,29 @@
   function sanitize(raw) {
     let n = raw.trim().replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/_+$/, '');
     return n.length > 0 ? n[0].toUpperCase() + n.slice(1) : 'MyAuto';
+  }
+
+  function mirrorMapY(y) {
+    return -y;
+  }
+
+  function headingFromVector(dx, dy) {
+    return Math.atan2(dx, dy) * 180 / Math.PI;
+  }
+
+  function getDriveWaypoints(card) {
+    const wpRows = card.querySelectorAll('.waypoint-row');
+    const pts = [];
+    wpRows.forEach(row => {
+      const x = parseFloat(row.querySelector('.wp-x').value);
+      const y = parseFloat(row.querySelector('.wp-y').value);
+      if (!isNaN(x) && !isNaN(y)) pts.push([x, y]);
+    });
+    return pts;
+  }
+
+  function formatTimeMs(ms) {
+    return `${(Math.max(0, ms) / 1000).toFixed(2)}s`;
   }
 
   function applyDefaults() {
