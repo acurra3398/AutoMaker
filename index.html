@@ -358,6 +358,7 @@
       <div class="legend-item"><div class="legend-dot" style="background:#81a1c1"></div><span>⏸ Wait</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:#d08770"></div><span>↺ Transfer</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:#ebcb8b"></div><span>◎ Aim</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#a3be8c"></div><span>⇢ Intake</span></div>
     </div>
     <div class="playback-controls">
       <div class="playback-row">
@@ -496,6 +497,16 @@
     return `${(Math.max(0, ms) / 1000).toFixed(2)}s`;
   }
 
+  function getKnownPointsUi(key = getKey()) {
+    return (KNOWN_POINTS[key] || []).map(pt => ({
+      ...pt,
+      xRr: pt.x,
+      yRr: pt.y,
+      xDoc: rrToDoc(pt.x),
+      yDoc: rrToDoc(pt.y)
+    }));
+  }
+
   function applyDefaults() {
     const d = DEFAULTS[getKey()];
     if (!d) return;
@@ -529,7 +540,7 @@
 
     const typeSelect = document.createElement('select');
     typeSelect.className = 'step-type';
-    ['Drive', 'Drive + Turn', 'Turn', 'Wait', 'Shoot', 'Transfer', 'Aim Turret'].forEach(t => {
+    ['Drive', 'Drive + Turn', 'Turn', 'Wait', 'Shoot', 'Transfer', 'Aim Turret', 'Intake'].forEach(t => {
       const o = document.createElement('option');
       o.value = t; o.textContent = t;
       typeSelect.appendChild(o);
@@ -698,6 +709,29 @@
       };
       div.querySelector('.p-aim-angle').oninput = regenerate;
       container.appendChild(div);
+
+    } else if (type === 'Intake') {
+      const div = document.createElement('div');
+      div.innerHTML = `
+        <label>Action:
+          <select class="p-intake-mode">
+            <option value="start">Start Intake (<code>IntakeStartCommand</code>)</option>
+            <option value="stop">Stop Intake (<code>IntakeStopCommand</code>)</option>
+            <option value="spit">Spit Intake (<code>IntakeSpitCommand</code>)</option>
+            <option value="custom">Custom Power (<code>SetCustomIntakePowerCommand</code>)</option>
+          </select>
+        </label>
+        <label class="custom-power-row" style="display:none;margin-top:8px">
+          Power (-1.0 to 1.0): <input type="number" step="0.05" class="p-intake-power" value="0.7" style="width:90px">
+        </label>`;
+      const modeSelect = div.querySelector('.p-intake-mode');
+      const customRow = div.querySelector('.custom-power-row');
+      modeSelect.onchange = () => {
+        customRow.style.display = modeSelect.value === 'custom' ? 'block' : 'none';
+        regenerate();
+      };
+      div.querySelector('.p-intake-power').oninput = regenerate;
+      container.appendChild(div);
     }
   }
 
@@ -717,9 +751,10 @@
 
     function populatePicker() {
       picker.innerHTML = '<option value="">— named point —</option>';
-      (KNOWN_POINTS[getKey()] || []).forEach((pt, i) => {
+      getKnownPointsUi().forEach((pt, i) => {
         const o = document.createElement('option');
-        o.value = i; o.textContent = pt.label;
+        o.value = i;
+        o.textContent = `${pt.label} (${pt.xDoc.toFixed(1)}, ${pt.yDoc.toFixed(1)})`;
         picker.appendChild(o);
       });
     }
@@ -728,10 +763,10 @@
 
     picker.onchange = () => {
       if (picker.value === '') return;
-      const pt = (KNOWN_POINTS[getKey()] || [])[parseInt(picker.value)];
+      const pt = getKnownPointsUi()[parseInt(picker.value)];
       if (!pt) return;
-      xIn.value = rrToDoc(pt.x);
-      yIn.value = rrToDoc(pt.y);
+      xIn.value = pt.xDoc;
+      yIn.value = pt.yDoc;
       if (pt.shootPreset) {
         const p = pt.shootPreset;
         document.getElementById('veloL').value = p.veloL;
@@ -850,6 +885,19 @@
       else if (mode === 'robot_stored') { cls = 'TurnTurretToPosCommand';             arg = 'preAimTurretAngle'; }
       else                              { cls = 'TurnTurretToPosCommand';             arg = customAngle;       }
       return `.callback(() -> {\n${IND_CB}new ${cls}(${arg}).schedule();\n${IND_CHAIN}})`;
+
+    } else if (type === 'Intake') {
+      const mode = card.querySelector('.p-intake-mode')?.value || 'start';
+      if (mode === 'start') {
+        return `.callback(() -> {\n${IND_CB}new IntakeStartCommand().schedule();\n${IND_CHAIN}})`;
+      } else if (mode === 'stop') {
+        return `.callback(() -> {\n${IND_CB}new IntakeStopCommand().schedule();\n${IND_CHAIN}})`;
+      } else if (mode === 'spit') {
+        return `.callback(() -> {\n${IND_CB}new IntakeSpitCommand().schedule();\n${IND_CHAIN}})`;
+      }
+      const rawPower = parseFloat(card.querySelector('.p-intake-power')?.value || '0.7');
+      const power = isNaN(rawPower) ? 0.7 : Math.max(-1, Math.min(1, rawPower));
+      return `.callback(() -> {\n${IND_CB}new SetCustomIntakePowerCommand(${power.toFixed(2)}).schedule();\n${IND_CHAIN}})`;
     }
     return null;
   }
@@ -872,12 +920,19 @@
     // Collect path segments from step cards
     const cards = document.querySelectorAll('.step-card');
     let usesAntiJam = false, usesSpit = false;
+    let usesIntakeStart = false, usesIntakeStop = false, usesIntakeCustom = false;
     const segments = [];
     cards.forEach(card => {
       const type = card.querySelector('.step-type').value;
       if (type === 'Shoot') {
         if (card.querySelector('.p-antijam')?.checked) usesAntiJam = true;
         if (card.querySelector('.p-spit')?.checked)    usesSpit    = true;
+      } else if (type === 'Intake') {
+        const mode = card.querySelector('.p-intake-mode')?.value || 'start';
+        if (mode === 'start')  usesIntakeStart = true;
+        if (mode === 'stop')   usesIntakeStop = true;
+        if (mode === 'spit')   usesSpit = true;
+        if (mode === 'custom') usesIntakeCustom = true;
       }
       const seg = buildSegment(card);
       if (seg) segments.push(seg);
@@ -904,6 +959,15 @@
     const spitImport = usesSpit
       ? 'import org.firstinspires.ftc.teamcode.blucru.common.subsytems.intake.IntakeSpitCommand;\n'
       : '';
+    const intakeStartImport = usesIntakeStart
+      ? 'import org.firstinspires.ftc.teamcode.blucru.common.subsytems.intake.IntakeStartCommand;\n'
+      : '';
+    const intakeStopImport = usesIntakeStop
+      ? 'import org.firstinspires.ftc.teamcode.blucru.common.subsytems.intake.IntakeStopCommand;\n'
+      : '';
+    const intakeCustomImport = usesIntakeCustom
+      ? 'import org.firstinspires.ftc.teamcode.blucru.common.subsytems.intake.SetCustomIntakePowerCommand;\n'
+      : '';
 
     const code =
 `package org.firstinspires.ftc.teamcode.blucru.opmodes.auto;
@@ -913,7 +977,7 @@ import com.seattlesolvers.solverslib.command.WaitCommand;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 
 import org.firstinspires.ftc.teamcode.blucru.common.commands.autonomousCommands.AutonomousShootCommand;
-${antiJamImport}${spitImport}import org.firstinspires.ftc.teamcode.blucru.common.commands.autonomousCommands.AutonomousTransferCommand;
+${antiJamImport}${spitImport}${intakeStartImport}${intakeStopImport}${intakeCustomImport}import org.firstinspires.ftc.teamcode.blucru.common.commands.autonomousCommands.AutonomousTransferCommand;
 import org.firstinspires.ftc.teamcode.blucru.common.pathing.Path;
 import org.firstinspires.ftc.teamcode.blucru.common.pathing.SixWheelPIDPathBuilder;
 import org.firstinspires.ftc.teamcode.blucru.common.subsytems.outtake.shooter.shooterCommands.SetShooterVelocityIndependentCommand;
@@ -1116,6 +1180,8 @@ ${pathBody}
         pushHold(label, Math.max(400, isNaN(ms) ? 1000 : ms));
       } else if (type === 'Aim Turret') {
         pushHold(label, 300);
+      } else if (type === 'Intake') {
+        pushHold(label, 220);
       }
     });
 
@@ -1327,16 +1393,16 @@ ${pathBody}
     const key = getKey();
 
     // Known points (white translucent dots + labels)
-    (KNOWN_POINTS[key] || []).forEach(pt => {
-      const [cx, cy] = toC(pt.x, pt.y);
-      drawRobotBox(ctx, toC, pt.x, pt.y, 'rgba(255,255,255,0.28)', 'rgba(255,255,255,0.04)');
+    getKnownPointsUi(key).forEach(pt => {
+      const [cx, cy] = toC(pt.xRr, pt.yRr);
+      drawRobotBox(ctx, toC, pt.xRr, pt.yRr, 'rgba(255,255,255,0.28)', 'rgba(255,255,255,0.04)');
       ctx.fillStyle = 'rgba(255,255,255,0.20)';
       ctx.strokeStyle = 'rgba(255,255,255,0.50)';
       ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.fillStyle = 'rgba(255,255,255,0.65)';
       ctx.font = '9px Arial';
-      ctx.fillText(pt.label, cx + 7, cy + 3);
+      ctx.fillText(`${pt.label} (${pt.xDoc.toFixed(0)}, ${pt.yDoc.toFixed(0)})`, cx + 7, cy + 3);
     });
 
     // ── Start pose ──
@@ -1472,6 +1538,10 @@ ${pathBody}
           drawActionMarker(ctx, cx + ox, cy, '#d08770', '↺', i + 1, 'XFER');
         } else if (type === 'Aim Turret') {
           drawActionMarker(ctx, cx + ox, cy, '#ebcb8b', '◎', i + 1, 'AIM');
+        } else if (type === 'Intake') {
+          const mode = card.querySelector('.p-intake-mode')?.value || 'start';
+          const txt = mode === 'start' ? 'IN' : mode === 'stop' ? 'STOP' : mode === 'spit' ? 'SPIT' : 'PWR';
+          drawActionMarker(ctx, cx + ox, cy, '#a3be8c', '⇢', i + 1, txt);
         }
         samePosCnt++;
       }
