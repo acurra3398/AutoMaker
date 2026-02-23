@@ -489,13 +489,19 @@
     return mapped;
   }
 
+  // UI coordinates follow the rendered map orientation; raw coords remain FTC Pose2d.
+  function toUiX(x) { return RENDER_FLIP_X ? -x : x; }
+  function toUiY(y) { return RENDER_FLIP_Y ? -y : y; }
+  function fromUiX(x) { return RENDER_FLIP_X ? -x : x; }
+  function fromUiY(y) { return RENDER_FLIP_Y ? -y : y; }
+
   function getDriveWaypoints(card) {
     const wpRows = card.querySelectorAll('.waypoint-row');
     const pts = [];
     wpRows.forEach(row => {
-      const x = parseFloat(row.querySelector('.wp-x').value);
-      const y = parseFloat(row.querySelector('.wp-y').value);
-      if (!isNaN(x) && !isNaN(y)) pts.push([x, y]);
+      const xUi = parseFloat(row.querySelector('.wp-x').value);
+      const yUi = parseFloat(row.querySelector('.wp-y').value);
+      if (!isNaN(xUi) && !isNaN(yUi)) pts.push([fromUiX(xUi), fromUiY(yUi)]);
     });
     return pts;
   }
@@ -589,7 +595,7 @@
 
       const wpTitle = document.createElement('div');
       wpTitle.style.cssText = 'font-size:13px;color:#c8d8ee;margin-bottom:4px';
-      wpTitle.textContent = 'Waypoints (x, y) Pose2d coords (-72..72, center 0,0) — in order:';
+      wpTitle.textContent = 'Waypoints (x, y) map-view coords — in order:';
       wpSection.appendChild(wpTitle);
 
       const wpList = document.createElement('div');
@@ -635,7 +641,7 @@
       wpSection.style.marginTop = '10px';
       const wpTitle = document.createElement('div');
       wpTitle.style.cssText = 'font-size:13px;color:#c8d8ee;margin-bottom:4px';
-      wpTitle.textContent = 'Waypoints (x, y) Pose2d coords (-72..72, center 0,0) — in order:';
+      wpTitle.textContent = 'Waypoints (x, y) map-view coords — in order:';
       wpSection.appendChild(wpTitle);
       const wpList = document.createElement('div');
       wpList.className = 'waypoint-list';
@@ -751,7 +757,7 @@
       (KNOWN_POINTS[getKey()] || []).forEach((pt, i) => {
         const o = document.createElement('option');
         o.value = i;
-        o.textContent = `${pt.label} (${pt.x.toFixed(1)}, ${pt.y.toFixed(1)})`;
+        o.textContent = `${pt.label} (${toUiX(pt.x).toFixed(1)}, ${toUiY(pt.y).toFixed(1)})`;
         picker.appendChild(o);
       });
     }
@@ -762,8 +768,8 @@
       if (picker.value === '') return;
       const pt = (KNOWN_POINTS[getKey()] || [])[parseInt(picker.value)];
       if (!pt) return;
-      xIn.value = pt.x;
-      yIn.value = pt.y;
+      xIn.value = toUiX(pt.x);
+      yIn.value = toUiY(pt.y);
       if (pt.shootPreset) {
         const p = pt.shootPreset;
         document.getElementById('veloL').value = p.veloL;
@@ -815,10 +821,10 @@
       const wpRows = card.querySelectorAll('.waypoint-row');
       if (wpRows.length === 0) return null;
       const pts = Array.from(wpRows).map(r => {
-        const x = parseFloat(r.querySelector('.wp-x').value || '0');
-        const y = parseFloat(r.querySelector('.wp-y').value || '0');
-        const xVal = isNaN(x) ? 0 : x;
-        const yVal = isNaN(y) ? 0 : y;
+        const xUi = parseFloat(r.querySelector('.wp-x').value || '0');
+        const yUi = parseFloat(r.querySelector('.wp-y').value || '0');
+        const xVal = isNaN(xUi) ? 0 : fromUiX(xUi);
+        const yVal = isNaN(yUi) ? 0 : fromUiY(yUi);
         return `${IND_CHAIN}        new Point2d(${xVal}, ${yVal})`;
       });
       return `.addPurePursuitPath(new Point2d[]{\n${pts.join(',\n')}\n${IND_CHAIN}}, ${velo})`;
@@ -831,10 +837,10 @@
       const wpRows  = card.querySelectorAll('.waypoint-row');
       if (wpRows.length === 0) return null;
       const pts = Array.from(wpRows).map(r => {
-        const x = parseFloat(r.querySelector('.wp-x').value || '0');
-        const y = parseFloat(r.querySelector('.wp-y').value || '0');
-        const xVal = isNaN(x) ? 0 : x;
-        const yVal = isNaN(y) ? 0 : y;
+        const xUi = parseFloat(r.querySelector('.wp-x').value || '0');
+        const yUi = parseFloat(r.querySelector('.wp-y').value || '0');
+        const xVal = isNaN(xUi) ? 0 : fromUiX(xUi);
+        const yVal = isNaN(yUi) ? 0 : fromUiY(yUi);
         return `${IND_CHAIN}        new Point2d(${xVal}, ${yVal})`;
       });
       const turnCall  = `.addTurnTo(${angle}, ${timeout})`;
@@ -1419,7 +1425,7 @@ ${pathBody}
       ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.fillStyle = 'rgba(255,255,255,0.65)';
       ctx.font = '9px Arial';
-      ctx.fillText(`${pt.label} (${pt.x.toFixed(0)}, ${pt.y.toFixed(0)})`, cx + 7, cy + 3);
+      ctx.fillText(`${pt.label} (${toUiX(pt.x).toFixed(0)}, ${toUiY(pt.y).toFixed(0)})`, cx + 7, cy + 3);
     });
 
     // ── Start pose ──
