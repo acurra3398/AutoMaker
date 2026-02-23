@@ -442,6 +442,7 @@
   const FIELD_SIZE_IN = FIELD_MAX - FIELD_MIN;
   const ROBOT_BOX_SIZE_IN = 18;
   const DRIVE_IN_PER_SEC_AT_2000 = 50;
+  const FIELD_IMAGE_ROTATE_180 = true;
 
   const playback = {
     isPlaying: false,
@@ -464,12 +465,7 @@
     return n.length > 0 ? n[0].toUpperCase() + n.slice(1) : 'MyAuto';
   }
 
-  function docToRr(v) { return v; }
-  function rrToDoc(v) { return v; }
-
-  function mirrorMapY(y) {
-    return y;
-  }
+  function mirrorMapY(y) { return y; }
 
   function headingFromVector(dx, dy) {
     // RR/Pose2d convention: 0° = +y (up), +90° = -x (left)
@@ -480,25 +476,15 @@
     const wpRows = card.querySelectorAll('.waypoint-row');
     const pts = [];
     wpRows.forEach(row => {
-      const xDoc = parseFloat(row.querySelector('.wp-x').value);
-      const yDoc = parseFloat(row.querySelector('.wp-y').value);
-      if (!isNaN(xDoc) && !isNaN(yDoc)) pts.push([docToRr(xDoc), docToRr(yDoc)]);
+      const x = parseFloat(row.querySelector('.wp-x').value);
+      const y = parseFloat(row.querySelector('.wp-y').value);
+      if (!isNaN(x) && !isNaN(y)) pts.push([x, y]);
     });
     return pts;
   }
 
   function formatTimeMs(ms) {
     return `${(Math.max(0, ms) / 1000).toFixed(2)}s`;
-  }
-
-  function getKnownPointsUi(key = getKey()) {
-    return (KNOWN_POINTS[key] || []).map(pt => ({
-      ...pt,
-      xRr: pt.x,
-      yRr: pt.y,
-      xDoc: rrToDoc(pt.x),
-      yDoc: rrToDoc(pt.y)
-    }));
   }
 
   function applyDefaults() {
@@ -745,10 +731,10 @@
 
     function populatePicker() {
       picker.innerHTML = '<option value="">— named point —</option>';
-      getKnownPointsUi().forEach((pt, i) => {
+      (KNOWN_POINTS[getKey()] || []).forEach((pt, i) => {
         const o = document.createElement('option');
         o.value = i;
-        o.textContent = `${pt.label} (${pt.xDoc.toFixed(1)}, ${pt.yDoc.toFixed(1)})`;
+        o.textContent = `${pt.label} (${pt.x.toFixed(1)}, ${pt.y.toFixed(1)})`;
         picker.appendChild(o);
       });
     }
@@ -757,10 +743,10 @@
 
     picker.onchange = () => {
       if (picker.value === '') return;
-      const pt = getKnownPointsUi()[parseInt(picker.value)];
+      const pt = (KNOWN_POINTS[getKey()] || [])[parseInt(picker.value)];
       if (!pt) return;
-      xIn.value = pt.xDoc;
-      yIn.value = pt.yDoc;
+      xIn.value = pt.x;
+      yIn.value = pt.y;
       if (pt.shootPreset) {
         const p = pt.shootPreset;
         document.getElementById('veloL').value = p.veloL;
@@ -812,11 +798,11 @@
       const wpRows = card.querySelectorAll('.waypoint-row');
       if (wpRows.length === 0) return null;
       const pts = Array.from(wpRows).map(r => {
-        const xDoc = parseFloat(r.querySelector('.wp-x').value || '0');
-        const yDoc = parseFloat(r.querySelector('.wp-y').value || '0');
-        const x = isNaN(xDoc) ? 0 : docToRr(xDoc);
-        const y = isNaN(yDoc) ? 0 : docToRr(yDoc);
-        return `${IND_CHAIN}        new Point2d(${x}, ${y})`;
+        const x = parseFloat(r.querySelector('.wp-x').value || '0');
+        const y = parseFloat(r.querySelector('.wp-y').value || '0');
+        const xVal = isNaN(x) ? 0 : x;
+        const yVal = isNaN(y) ? 0 : y;
+        return `${IND_CHAIN}        new Point2d(${xVal}, ${yVal})`;
       });
       return `.addPurePursuitPath(new Point2d[]{\n${pts.join(',\n')}\n${IND_CHAIN}}, ${velo})`;
 
@@ -828,11 +814,11 @@
       const wpRows  = card.querySelectorAll('.waypoint-row');
       if (wpRows.length === 0) return null;
       const pts = Array.from(wpRows).map(r => {
-        const xDoc = parseFloat(r.querySelector('.wp-x').value || '0');
-        const yDoc = parseFloat(r.querySelector('.wp-y').value || '0');
-        const x = isNaN(xDoc) ? 0 : docToRr(xDoc);
-        const y = isNaN(yDoc) ? 0 : docToRr(yDoc);
-        return `${IND_CHAIN}        new Point2d(${x}, ${y})`;
+        const x = parseFloat(r.querySelector('.wp-x').value || '0');
+        const y = parseFloat(r.querySelector('.wp-y').value || '0');
+        const xVal = isNaN(x) ? 0 : x;
+        const yVal = isNaN(y) ? 0 : y;
+        return `${IND_CHAIN}        new Point2d(${xVal}, ${yVal})`;
       });
       const turnCall  = `.addTurnTo(${angle}, ${timeout})`;
       const driveCall = `.addPurePursuitPath(new Point2d[]{\n${pts.join(',\n')}\n${IND_CHAIN}}, ${velo})`;
@@ -1341,7 +1327,15 @@ ${pathBody}
 
     // ── Background: FTC field photo ──
     if (fieldImg.complete && fieldImg.naturalWidth > 0) {
-      ctx.drawImage(fieldImg, 0, 0, W, H);
+      if (FIELD_IMAGE_ROTATE_180) {
+        ctx.save();
+        ctx.translate(W, H);
+        ctx.rotate(Math.PI);
+        ctx.drawImage(fieldImg, 0, 0, W, H);
+        ctx.restore();
+      } else {
+        ctx.drawImage(fieldImg, 0, 0, W, H);
+      }
       // Darken slightly so overlays read clearly
       ctx.fillStyle = 'rgba(0,0,0,0.28)';
       ctx.fillRect(0, 0, W, H);
@@ -1387,16 +1381,16 @@ ${pathBody}
     const key = getKey();
 
     // Known points (white translucent dots + labels)
-    getKnownPointsUi(key).forEach(pt => {
-      const [cx, cy] = toC(pt.xRr, pt.yRr);
-      drawRobotBox(ctx, toC, pt.xRr, pt.yRr, 'rgba(255,255,255,0.28)', 'rgba(255,255,255,0.04)');
+    (KNOWN_POINTS[key] || []).forEach(pt => {
+      const [cx, cy] = toC(pt.x, pt.y);
+      drawRobotBox(ctx, toC, pt.x, pt.y, 'rgba(255,255,255,0.28)', 'rgba(255,255,255,0.04)');
       ctx.fillStyle = 'rgba(255,255,255,0.20)';
       ctx.strokeStyle = 'rgba(255,255,255,0.50)';
       ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.fillStyle = 'rgba(255,255,255,0.65)';
       ctx.font = '9px Arial';
-      ctx.fillText(`${pt.label} (${pt.xDoc.toFixed(0)}, ${pt.yDoc.toFixed(0)})`, cx + 7, cy + 3);
+      ctx.fillText(`${pt.label} (${pt.x.toFixed(0)}, ${pt.y.toFixed(0)})`, cx + 7, cy + 3);
     });
 
     // ── Start pose ──
