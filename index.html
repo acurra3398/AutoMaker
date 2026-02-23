@@ -446,9 +446,9 @@
   const FIELD_SIZE_IN = FIELD_MAX - FIELD_MIN;
   const ROBOT_BOX_SIZE_IN = 18;
   const DRIVE_IN_PER_SEC_AT_2000 = 50;
-  const RENDER_FLIP_X = true;
-  const RENDER_FLIP_Y = true;
-  const FIELD_IMAGE_EXTRA_ROTATE_180 = true;
+  const RENDER_FLIP_X = false;
+  const RENDER_FLIP_Y = false;
+  const FIELD_IMAGE_EXTRA_ROTATE_180 = false;
 
   const playback = {
     isPlaying: false,
@@ -484,7 +484,7 @@
     let dy =  Math.cos(hRad);
     if (RENDER_FLIP_X) dx *= -1;
     if (RENDER_FLIP_Y) dy *= -1;
-    let mapped = -headingFromVector(dx, dy);
+    let mapped = headingFromVector(dx, dy);
     if (FIELD_IMAGE_EXTRA_ROTATE_180) mapped += 180;
     return mapped;
   }
