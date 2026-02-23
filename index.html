@@ -480,7 +480,9 @@
     let dy =  Math.cos(hRad);
     if (RENDER_FLIP_X) dx *= -1;
     if (RENDER_FLIP_Y) dy *= -1;
-    return headingFromVector(dx, dy);
+    let mapped = -headingFromVector(dx, dy);
+    if (FIELD_IMAGE_EXTRA_ROTATE_180) mapped += 180;
+    return mapped;
   }
 
   function getDriveWaypoints(card) {
