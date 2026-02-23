@@ -77,20 +77,17 @@
 
     /* Two-column layout */
     .page-layout {
-      display: flex;
-      gap: 24px;
-      align-items: flex-start;
+      display: block;
     }
     .left-col {
-      flex: 1;
-      min-width: 0;
+      width: 100%;
     }
     .right-col {
-      flex: 0 0 690px;
+      width: 100%;
+      margin-top: 20px;
     }
     .canvas-sticky {
-      position: sticky;
-      top: 20px;
+      position: static;
     }
     .canvas-sticky h2 {
       margin: 0 0 8px 0;
@@ -100,6 +97,8 @@
       border-radius: 4px;
       display: block;
       background: #1a1a1a;
+      width: min(100%, 1000px);
+      height: auto;
     }
     .field-legend {
       margin-top: 8px;
@@ -305,7 +304,7 @@
 <div class="right-col">
   <div class="canvas-sticky">
     <h2>Field Preview</h2>
-    <canvas id="fieldCanvas" width="650" height="650"></canvas>
+    <canvas id="fieldCanvas" width="1000" height="1000"></canvas>
     <div class="field-legend">
       <div class="legend-item"><div class="legend-dot" style="background:#5e81ac;border:2px solid #fff"></div><span>Start</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:#88c0d0"></div><span>Drive</span></div>
@@ -943,6 +942,7 @@ ${pathBody}
     const box = document.getElementById('output');
     box.textContent = code;
     Prism.highlightElement(box);
+    buildMotionTimeline();
     renderField();
   }
 
@@ -955,6 +955,231 @@ ${pathBody}
   fieldImg.src = 'field.webp';
   fieldImg.onload = renderField;
 
+  function polylineLength(points) {
+    let total = 0;
+    for (let i = 1; i < points.length; i++) {
+      const dx = points[i][0] - points[i - 1][0];
+      const dy = points[i][1] - points[i - 1][1];
+      total += Math.hypot(dx, dy);
+    }
+    return total;
+  }
+
+  function buildMotionTimeline() {
+    const key = getKey();
+    const pose = START_POSES[key];
+    let px = pose.x, py = pose.y, heading = pose.heading;
+    let tMs = 0;
+    const segs = [];
+
+    const pushHold = (label, durationMs) => {
+      const dur = Math.max(0, durationMs);
+      segs.push({ type: 'hold', label, startMs: tMs, endMs: tMs + dur, x: px, y: py, heading });
+      tMs += dur;
+    };
+
+    const pushTurn = (angleDeg, timeoutMs, label) => {
+      const turnDur = Math.max(120, isNaN(timeoutMs) ? 800 : Math.abs(timeoutMs));
+      const startHeading = heading;
+      const endHeading = startHeading + (isNaN(angleDeg) ? 0 : angleDeg);
+      segs.push({
+        type: 'turn',
+        label,
+        startMs: tMs,
+        endMs: tMs + turnDur,
+        x: px,
+        y: py,
+        startHeading,
+        endHeading
+      });
+      tMs += turnDur;
+      heading = endHeading;
+    };
+
+    const pushDrive = (pts, veloRaw, label) => {
+      if (!pts.length) return;
+      const path = [[px, py], ...pts];
+      const lengthIn = polylineLength(path);
+      if (lengthIn <= 0.001) return;
+      const velo = Math.max(1, isNaN(veloRaw) ? 2000 : Math.abs(veloRaw));
+      const speedInPerSec = Math.max(8, (velo / 2000) * DRIVE_IN_PER_SEC_AT_2000);
+      const duration = Math.max(120, (lengthIn / speedInPerSec) * 1000);
+      segs.push({
+        type: 'drive',
+        label,
+        startMs: tMs,
+        endMs: tMs + duration,
+        path,
+        lengthIn
+      });
+      tMs += duration;
+      const [lx, ly] = pts[pts.length - 1];
+      if (pts.length > 0) {
+        const [sx, sy] = path[path.length - 2];
+        heading = headingFromVector(lx - sx, ly - sy);
+      }
+      px = lx;
+      py = ly;
+    };
+
+    document.querySelectorAll('.step-card').forEach((card, i) => {
+      const type = card.querySelector('.step-type').value;
+      const label = `${i + 1} ${type}`;
+
+      if (type === 'Drive') {
+        pushDrive(getDriveWaypoints(card), parseFloat(card.querySelector('.p-velo')?.value || '2000'), label);
+      } else if (type === 'Drive + Turn') {
+        const pts = getDriveWaypoints(card);
+        const order = card.querySelector('.p-dt-order')?.value || 'turn_first';
+        const angle = parseFloat(card.querySelector('.p-dt-angle')?.value || '0');
+        const timeout = parseFloat(card.querySelector('.p-dt-timeout')?.value || '1000');
+        if (order === 'turn_first') {
+          pushTurn(angle, timeout, `${label} turn`);
+          pushDrive(pts, parseFloat(card.querySelector('.p-velo')?.value || '2000'), `${label} drive`);
+        } else {
+          pushDrive(pts, parseFloat(card.querySelector('.p-velo')?.value || '2000'), `${label} drive`);
+          pushTurn(angle, timeout, `${label} turn`);
+        }
+      } else if (type === 'Turn') {
+        const angle = parseFloat(card.querySelector('.p-turn-angle')?.value || '0');
+        const timeout = parseFloat(card.querySelector('.p-turn-timeout')?.value || '1000');
+        pushTurn(angle, timeout, label);
+      } else if (type === 'Wait') {
+        const ms = parseFloat(card.querySelector('.p-wait-ms')?.value || '500');
+        pushHold(label, isNaN(ms) ? 500 : ms);
+      } else if (type === 'Shoot') {
+        pushHold(label, 450);
+      } else if (type === 'Transfer') {
+        const ms = parseFloat(card.querySelector('.p-tf-wait')?.value || '1000');
+        pushHold(label, Math.max(400, isNaN(ms) ? 1000 : ms));
+      } else if (type === 'Aim Turret') {
+        pushHold(label, 300);
+      }
+    });
+
+    playback.segments = segs;
+    playback.durationMs = Math.max(0, tMs);
+    if (playback.tMs > playback.durationMs) playback.tMs = playback.durationMs;
+    if (playback.isPlaying && playback.durationMs === 0) stopPlayback();
+    playback.tMs = Math.min(playback.tMs, playback.durationMs);
+    updatePlaybackUi();
+  }
+
+  function interpolateOnPath(path, progress) {
+    if (!path.length) return null;
+    if (path.length === 1) return { x: path[0][0], y: path[0][1], heading: 0 };
+
+    const total = polylineLength(path);
+    if (total <= 0.001) return { x: path[path.length - 1][0], y: path[path.length - 1][1], heading: 0 };
+
+    let remaining = Math.max(0, Math.min(1, progress)) * total;
+    for (let i = 1; i < path.length; i++) {
+      const [x1, y1] = path[i - 1];
+      const [x2, y2] = path[i];
+      const segLen = Math.hypot(x2 - x1, y2 - y1);
+      if (remaining <= segLen || i === path.length - 1) {
+        const u = segLen <= 1e-6 ? 1 : Math.max(0, Math.min(1, remaining / segLen));
+        return {
+          x: x1 + (x2 - x1) * u,
+          y: y1 + (y2 - y1) * u,
+          heading: headingFromVector(x2 - x1, y2 - y1)
+        };
+      }
+      remaining -= segLen;
+    }
+    const last = path[path.length - 1];
+    const prev = path[path.length - 2];
+    return { x: last[0], y: last[1], heading: headingFromVector(last[0] - prev[0], last[1] - prev[1]) };
+  }
+
+  function getPlaybackPoseAt(tMs) {
+    const key = getKey();
+    const pose = START_POSES[key];
+    if (!playback.segments.length) return { x: pose.x, y: pose.y, heading: pose.heading, label: 'Start' };
+
+    const t = Math.max(0, Math.min(playback.durationMs, tMs));
+    let seg = playback.segments.find(s => t <= s.endMs) || playback.segments[playback.segments.length - 1];
+    if (!seg) return { x: pose.x, y: pose.y, heading: pose.heading, label: 'Start' };
+
+    if (seg.type === 'drive') {
+      const span = Math.max(1, seg.endMs - seg.startMs);
+      const p = (t - seg.startMs) / span;
+      const ip = interpolateOnPath(seg.path, p);
+      return { x: ip.x, y: ip.y, heading: ip.heading, label: seg.label };
+    }
+    if (seg.type === 'turn') {
+      const span = Math.max(1, seg.endMs - seg.startMs);
+      const p = (t - seg.startMs) / span;
+      return {
+        x: seg.x,
+        y: seg.y,
+        heading: seg.startHeading + (seg.endHeading - seg.startHeading) * p,
+        label: seg.label
+      };
+    }
+    return { x: seg.x, y: seg.y, heading: seg.heading, label: seg.label };
+  }
+
+  function updatePlaybackUi() {
+    const seek = document.getElementById('playbackSeek');
+    const time = document.getElementById('playbackTime');
+    const playBtn = document.getElementById('playPauseBtn');
+    if (!seek || !time || !playBtn) return;
+    const max = Math.max(1, Math.round(playback.durationMs));
+    seek.max = String(max);
+    seek.value = String(Math.min(max, Math.round(playback.tMs)));
+    time.textContent = `${formatTimeMs(playback.tMs)} / ${formatTimeMs(playback.durationMs)}`;
+    playBtn.textContent = playback.isPlaying ? 'Pause' : 'Play';
+  }
+
+  function stopPlayback() {
+    playback.isPlaying = false;
+    playback.lastTs = 0;
+    if (playback.rafId) {
+      cancelAnimationFrame(playback.rafId);
+      playback.rafId = null;
+    }
+    updatePlaybackUi();
+  }
+
+  function playbackTick(ts) {
+    if (!playback.isPlaying) return;
+    if (!playback.lastTs) playback.lastTs = ts;
+    const dt = ts - playback.lastTs;
+    playback.lastTs = ts;
+    playback.tMs += dt * playback.speed;
+    if (playback.tMs >= playback.durationMs) {
+      playback.tMs = playback.durationMs;
+      stopPlayback();
+      renderField();
+      return;
+    }
+    updatePlaybackUi();
+    renderField();
+    playback.rafId = requestAnimationFrame(playbackTick);
+  }
+
+  function startPlayback() {
+    if (!playback.durationMs) return;
+    playback.isPlaying = true;
+    playback.lastTs = 0;
+    updatePlaybackUi();
+    if (!playback.rafId) playback.rafId = requestAnimationFrame(playbackTick);
+  }
+
+  function drawRobotBox(ctx, toC, fx, fy, strokeStyle, fillStyle) {
+    const [cx, cy] = toC(fx, fy);
+    const halfW = (ROBOT_BOX_SIZE_IN / FIELD_SIZE_IN * ctx.canvas.width) / 2;
+    const halfH = (ROBOT_BOX_SIZE_IN / FIELD_SIZE_IN * ctx.canvas.height) / 2;
+    if (fillStyle) {
+      ctx.fillStyle = fillStyle;
+      ctx.fillRect(cx - halfW, cy - halfH, halfW * 2, halfH * 2);
+    }
+    ctx.strokeStyle = strokeStyle || 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(cx - halfW, cy - halfH, halfW * 2, halfH * 2);
+  }
+
   function renderField() {
     const canvas = document.getElementById('fieldCanvas');
     if (!canvas) return;
@@ -962,9 +1187,10 @@ ${pathBody}
     const W = canvas.width, H = canvas.height;
 
     // Field coords: -72..72 on both axes, y increases upward.
-    // Canvas: (0,0)=top-left, y increases downward.
+    // Map display mirrors points across X-axis.
     function toC(fx, fy) {
-      return [(fx + 72) / 144 * W, (72 - fy) / 144 * H];
+      const my = mirrorMapY(fy);
+      return [(fx - FIELD_MIN) / FIELD_SIZE_IN * W, (FIELD_MAX - my) / FIELD_SIZE_IN * H];
     }
 
     ctx.clearRect(0, 0, W, H);
@@ -990,10 +1216,10 @@ ${pathBody}
     // Tile grid overlay (subtle white lines)
     ctx.strokeStyle = 'rgba(255,255,255,0.10)';
     ctx.lineWidth = 0.75;
-    for (let i = -72; i <= 72; i += 24) {
-      const [x1, y1] = toC(i, -72), [x2, y2] = toC(i, 72);
+    for (let i = FIELD_MIN; i <= FIELD_MAX; i += 24) {
+      const [x1, y1] = toC(i, FIELD_MIN), [x2, y2] = toC(i, FIELD_MAX);
       ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-      const [x3, y3] = toC(-72, i), [x4, y4] = toC(72, i);
+      const [x3, y3] = toC(FIELD_MIN, i), [x4, y4] = toC(FIELD_MAX, i);
       ctx.beginPath(); ctx.moveTo(x3, y3); ctx.lineTo(x4, y4); ctx.stroke();
     }
 
@@ -1019,6 +1245,7 @@ ${pathBody}
     // Known points (white translucent dots + labels)
     (KNOWN_POINTS[key] || []).forEach(pt => {
       const [cx, cy] = toC(pt.x, pt.y);
+      drawRobotBox(ctx, toC, pt.x, pt.y, 'rgba(255,255,255,0.28)', 'rgba(255,255,255,0.04)');
       ctx.fillStyle = 'rgba(255,255,255,0.20)';
       ctx.strokeStyle = 'rgba(255,255,255,0.50)';
       ctx.lineWidth = 1;
@@ -1033,6 +1260,7 @@ ${pathBody}
     let px = pose.x, py = pose.y;
     {
       const [cx, cy] = toC(px, py);
+      drawRobotBox(ctx, toC, px, py, 'rgba(94,129,172,0.95)', 'rgba(94,129,172,0.16)');
       // Glow ring
       ctx.shadowColor = '#5e81ac'; ctx.shadowBlur = 12;
       ctx.fillStyle = '#5e81ac';
@@ -1063,13 +1291,7 @@ ${pathBody}
 
       // ── Drive / Drive + Turn ──
       if (type === 'Drive' || type === 'Drive + Turn') {
-        const wpRows = card.querySelectorAll('.waypoint-row');
-        const pts = [];
-        wpRows.forEach(row => {
-          const x = parseFloat(row.querySelector('.wp-x').value);
-          const y = parseFloat(row.querySelector('.wp-y').value);
-          if (!isNaN(x) && !isNaN(y)) pts.push([x, y]);
-        });
+        const pts = getDriveWaypoints(card);
 
         if (pts.length > 0) {
           const allField = [[px, py], ...pts];
@@ -1079,7 +1301,7 @@ ${pathBody}
           ctx.shadowColor = color; ctx.shadowBlur = 8;
           ctx.strokeStyle = color; ctx.lineWidth = 3.5;
           ctx.setLineDash([]); ctx.lineJoin = 'round';
-          drawCatmullRom(ctx, allC);
+          drawPolyline(ctx, allC);
           ctx.shadowBlur = 0;
 
           // Arrowhead — tangent direction at last segment end
@@ -1090,6 +1312,7 @@ ${pathBody}
           // Intermediate waypoint dots (skip first = previous robot pos)
           pts.forEach(([fx, fy]) => {
             const [cx, cy] = toC(fx, fy);
+            drawRobotBox(ctx, toC, fx, fy, 'rgba(255,255,255,0.40)', 'rgba(255,255,255,0.03)');
             ctx.fillStyle = color; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 1.5;
             ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
           });
@@ -1169,25 +1392,38 @@ ${pathBody}
         samePosCnt++;
       }
     });
+
+    const playbackPose = getPlaybackPoseAt(playback.tMs);
+    if (playbackPose) {
+      const [cx, cy] = toC(playbackPose.x, playbackPose.y);
+      drawRobotBox(ctx, toC, playbackPose.x, playbackPose.y, '#88ffd2', 'rgba(136,255,210,0.18)');
+      const hRad = (playbackPose.heading - 90) * Math.PI / 180;
+      const aLen = 24;
+      ctx.strokeStyle = '#88ffd2';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + aLen * Math.cos(hRad), cy + aLen * Math.sin(hRad));
+      ctx.stroke();
+      ctx.font = 'bold 10px Arial';
+      ctx.fillStyle = 'rgba(0,0,0,0.68)';
+      const label = playbackPose.label || 'Robot';
+      const lw = ctx.measureText(label).width + 10;
+      ctx.fillRect(cx - lw / 2, cy - 32, lw, 16);
+      ctx.fillStyle = '#88ffd2';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, cx, cy - 20);
+      ctx.textAlign = 'left';
+    }
   }
 
-  // Catmull-Rom spline through canvas points
-  function drawCatmullRom(ctx, pts) {
+  // Straight polyline through canvas points
+  function drawPolyline(ctx, pts) {
     if (pts.length < 2) return;
-    const STEPS = 32, n = pts.length;
     ctx.beginPath();
-    let started = false;
-    for (let i = 0; i < n - 1; i++) {
-      const p0 = pts[Math.max(0, i - 1)];
-      const p1 = pts[i];
-      const p2 = pts[i + 1];
-      const p3 = pts[Math.min(n - 1, i + 2)];
-      for (let j = 0; j <= STEPS; j++) {
-        const t = j / STEPS, t2 = t * t, t3 = t2 * t;
-        const x = 0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3);
-        const y = 0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3);
-        if (!started) { ctx.moveTo(x, y); started = true; } else { ctx.lineTo(x, y); }
-      }
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) {
+      ctx.lineTo(pts[i][0], pts[i][1]);
     }
     ctx.stroke();
   }
@@ -1245,10 +1481,35 @@ ${pathBody}
     navigator.clipboard.writeText(document.getElementById('output').textContent)
       .then(() => alert('Copied to clipboard!'));
   });
+  document.getElementById('playPauseBtn').addEventListener('click', () => {
+    if (playback.isPlaying) {
+      stopPlayback();
+      renderField();
+    } else {
+      startPlayback();
+    }
+  });
+  document.getElementById('resetPlaybackBtn').addEventListener('click', () => {
+    stopPlayback();
+    playback.tMs = 0;
+    updatePlaybackUi();
+    renderField();
+  });
+  document.getElementById('playbackSpeed').addEventListener('change', e => {
+    const v = parseFloat(e.target.value || '1');
+    playback.speed = isNaN(v) ? 1 : Math.max(0.1, v);
+  });
+  document.getElementById('playbackSeek').addEventListener('input', e => {
+    stopPlayback();
+    playback.tMs = parseFloat(e.target.value || '0');
+    updatePlaybackUi();
+    renderField();
+  });
 
   // Initial render
+  playback.speed = parseFloat(document.getElementById('playbackSpeed').value || '1') || 1;
   regenerate();
-  renderField();
+  updatePlaybackUi();
 </script>
 </body>
 </html>
