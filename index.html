@@ -123,6 +123,16 @@
     }
     .waypoint-row input { width: 80px; margin-top: 0; }
     .waypoint-row span { color: #555; }
+    .wp-picker {
+      font-size: 12px;
+      padding: 3px 4px;
+      margin-top: 0;
+      width: auto;
+      max-width: 140px;
+      background-color: #d0d8f0;
+      color: #000;
+      border: 1px solid #8899cc;
+    }
 
     /* Output */
     #outputContainer {
@@ -235,6 +245,45 @@
     RED_FAR:    { veloL: 1440, veloM: 1440, veloR: 1440, hoodL: 49, hoodM: 45, hoodR: 49, turret: 201,  preAim:  116 }
   };
 
+  // ── Known Field Points ─────────────────────────────────────────────────────
+  // shootPreset: if present, selecting this point also fills velocity/hood/turret
+
+  const KNOWN_POINTS = {
+    BLUE_CLOSE: [
+      { label: 'Start',           x: -49, y: -54 },
+      { label: 'Shooting Pos',    x: -16, y: -19, shootPreset: { veloL: 1150, veloM: 1150, veloR: 1150, hoodL: 30, hoodM: 30, hoodR: 30, turret: 142, preAim: -90 } },
+      { label: 'Close Intake 1',  x:  -6, y: -45 },
+      { label: 'Close Intake 2',  x:  -5, y: -57 },
+      { label: 'Close Intake 3',  x:  -8, y: -49 },
+      { label: 'Gate Intake',     x:  13, y: -49 },
+      { label: 'Far Gate Intake', x:  39, y: -46 },
+    ],
+    BLUE_FAR: [
+      { label: 'Start',           x:  63, y:  -7 },
+      { label: 'Shooting Pos',    x:  45, y:  -9, shootPreset: { veloL: 1440, veloM: 1440, veloR: 1430, hoodL: 49, hoodM: 45, hoodR: 49, turret: 156, preAim: -116 } },
+      { label: 'Wing Intake 1',   x:  37, y: -50 },
+      { label: 'Wing Intake 2',   x:  40, y: -40 },
+      { label: 'Wall Approach',   x:  61, y: -45 },
+      { label: 'Wall Pickup',     x:  63, y: -62 },
+    ],
+    RED_CLOSE: [
+      { label: 'Start',           x: -49, y:  54 },
+      { label: 'Shooting Pos',    x: -16, y:  19, shootPreset: { veloL: 1120, veloM: 1140, veloR: 1120, hoodL: 34, hoodM: 34, hoodR: 34, turret: 218, preAim: 90 } },
+      { label: 'Middle Intake 1', x:  12, y:  25 },
+      { label: 'Middle Intake 2', x:  12, y:  59 },
+      { label: 'Close Intake',    x:  -8, y:  49 },
+      { label: 'Gate Approach',   x:  19, y:  45 },
+      { label: 'Gate Area',       x:  14, y:  58 },
+    ],
+    RED_FAR: [
+      { label: 'Start',           x:  63, y:   7 },
+      { label: 'Shooting Pos',    x:  45, y:   9, shootPreset: { veloL: 1440, veloM: 1440, veloR: 1440, hoodL: 49, hoodM: 45, hoodR: 49, turret: 201, preAim: 116 } },
+      { label: 'Wing Intake 1',   x:  40, y:  48 },
+      { label: 'Wall Approach',   x:  61, y:  45 },
+      { label: 'Wall Pickup',     x:  63, y:  62 },
+    ],
+  };
+
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   function getKey() {
@@ -257,6 +306,7 @@
     document.getElementById('hoodR').value = d.hoodR;
     document.getElementById('turretAngle').value = d.turret;
     document.getElementById('preAimAngle').value = d.preAim;
+    repopulateAllPickers();
     regenerate();
   }
 
@@ -278,7 +328,7 @@
 
     const typeSelect = document.createElement('select');
     typeSelect.className = 'step-type';
-    ['Drive', 'Turn', 'Wait', 'Shoot', 'Transfer', 'Aim Turret'].forEach(t => {
+    ['Drive', 'Drive + Turn', 'Turn', 'Wait', 'Shoot', 'Transfer', 'Aim Turret'].forEach(t => {
       const o = document.createElement('option');
       o.value = t; o.textContent = t;
       typeSelect.appendChild(o);
@@ -344,6 +394,49 @@
       addBtn.onclick = e => { e.preventDefault(); addWaypoint(wpList); regenerate(); };
       wpSection.appendChild(addBtn);
 
+      container.appendChild(wpSection);
+      addWaypoint(wpList);
+      addWaypoint(wpList);
+
+    } else if (type === 'Drive + Turn') {
+      // Turn order selector
+      const orderDiv = document.createElement('div');
+      orderDiv.className = 'field-row';
+      orderDiv.innerHTML = `
+        <label>Order:
+          <select class="p-dt-order">
+            <option value="turn_first">Turn first, then drive</option>
+            <option value="drive_first">Drive first, then turn</option>
+          </select>
+        </label>
+        <label>Turn Angle (°): <input type="number" class="p-dt-angle" value="-90" style="width:90px"></label>
+        <label>Turn Timeout (ms): <input type="number" class="p-dt-timeout" value="1000" style="width:90px"></label>`;
+      orderDiv.querySelector('.p-dt-order').onchange = regenerate;
+      orderDiv.querySelector('.p-dt-angle').oninput = regenerate;
+      orderDiv.querySelector('.p-dt-timeout').oninput = regenerate;
+      container.appendChild(orderDiv);
+
+      // Drive params (same as Drive)
+      const veloRow = document.createElement('div');
+      veloRow.innerHTML = '<label style="margin-top:8px">Drive Max Velocity: <input type="number" class="p-velo" value="2000" style="width:100px"> <span style="color:#555;font-size:13px">(ticks/s)</span></label>';
+      veloRow.querySelector('.p-velo').oninput = regenerate;
+      container.appendChild(veloRow);
+
+      const wpSection = document.createElement('div');
+      wpSection.style.marginTop = '10px';
+      const wpTitle = document.createElement('div');
+      wpTitle.style.cssText = 'font-size:13px;color:#333;margin-bottom:4px';
+      wpTitle.textContent = 'Waypoints (x, y) — in order:';
+      wpSection.appendChild(wpTitle);
+      const wpList = document.createElement('div');
+      wpList.className = 'waypoint-list';
+      wpSection.appendChild(wpList);
+      const addBtn = document.createElement('button');
+      addBtn.className = 'small';
+      addBtn.textContent = '+ Waypoint';
+      addBtn.style.marginTop = '6px';
+      addBtn.onclick = e => { e.preventDefault(); addWaypoint(wpList); regenerate(); };
+      wpSection.appendChild(addBtn);
       container.appendChild(wpSection);
       addWaypoint(wpList);
       addWaypoint(wpList);
@@ -417,14 +510,57 @@
     const yIn = document.createElement('input');
     yIn.type = 'number'; yIn.placeholder = 'y'; yIn.className = 'wp-y'; yIn.oninput = regenerate;
 
+    // Named-point picker
+    const picker = document.createElement('select');
+    picker.className = 'wp-picker';
+
+    function populatePicker() {
+      picker.innerHTML = '<option value="">— named point —</option>';
+      (KNOWN_POINTS[getKey()] || []).forEach((pt, i) => {
+        const o = document.createElement('option');
+        o.value = i; o.textContent = pt.label;
+        picker.appendChild(o);
+      });
+    }
+    populatePicker();
+    row._populatePicker = populatePicker;
+
+    picker.onchange = () => {
+      if (picker.value === '') return;
+      const pt = (KNOWN_POINTS[getKey()] || [])[parseInt(picker.value)];
+      if (!pt) return;
+      xIn.value = pt.x;
+      yIn.value = pt.y;
+      if (pt.shootPreset) {
+        const p = pt.shootPreset;
+        document.getElementById('veloL').value = p.veloL;
+        document.getElementById('veloM').value = p.veloM;
+        document.getElementById('veloR').value = p.veloR;
+        document.getElementById('hoodL').value = p.hoodL;
+        document.getElementById('hoodM').value = p.hoodM;
+        document.getElementById('hoodR').value = p.hoodR;
+        document.getElementById('turretAngle').value = p.turret;
+        document.getElementById('preAimAngle').value = p.preAim;
+      }
+      picker.value = '';
+      regenerate();
+    };
+
     const rm = document.createElement('button');
     rm.textContent = '×'; rm.className = 'danger small';
     rm.onclick = e => { e.preventDefault(); row.remove(); regenerate(); };
 
-    row.appendChild(document.createTextNode('x: ')); row.appendChild(xIn);
+    row.appendChild(picker);
+    row.appendChild(document.createTextNode(' x: ')); row.appendChild(xIn);
     row.appendChild(document.createTextNode('  y: ')); row.appendChild(yIn);
     row.appendChild(rm);
     list.appendChild(row);
+  }
+
+  function repopulateAllPickers() {
+    document.querySelectorAll('.waypoint-row').forEach(row => {
+      if (row._populatePicker) row._populatePicker();
+    });
   }
 
   // ── Code generation ────────────────────────────────────────────────────────
@@ -451,6 +587,24 @@
         return `${IND_CHAIN}        new Point2d(${x}, ${y})`;
       });
       return `.addPurePursuitPath(new Point2d[]{\n${pts.join(',\n')}\n${IND_CHAIN}}, ${velo})`;
+
+    } else if (type === 'Drive + Turn') {
+      const order   = card.querySelector('.p-dt-order')?.value   || 'turn_first';
+      const angle   = card.querySelector('.p-dt-angle')?.value   || '0';
+      const timeout = card.querySelector('.p-dt-timeout')?.value || '1000';
+      const velo    = card.querySelector('.p-velo')?.value       || '2000';
+      const wpRows  = card.querySelectorAll('.waypoint-row');
+      if (wpRows.length === 0) return null;
+      const pts = Array.from(wpRows).map(r => {
+        const x = r.querySelector('.wp-x').value || '0';
+        const y = r.querySelector('.wp-y').value || '0';
+        return `${IND_CHAIN}        new Point2d(${x}, ${y})`;
+      });
+      const turnCall  = `.addTurnTo(${angle}, ${timeout})`;
+      const driveCall = `.addPurePursuitPath(new Point2d[]{\n${pts.join(',\n')}\n${IND_CHAIN}}, ${velo})`;
+      return order === 'turn_first'
+        ? `${turnCall}\n${IND_CHAIN}${driveCall}`
+        : `${driveCall}\n${IND_CHAIN}${turnCall}`;
 
     } else if (type === 'Turn') {
       const angle   = card.querySelector('.p-turn-angle')?.value   || '0';
