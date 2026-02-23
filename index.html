@@ -442,7 +442,8 @@
   const FIELD_SIZE_IN = FIELD_MAX - FIELD_MIN;
   const ROBOT_BOX_SIZE_IN = 18;
   const DRIVE_IN_PER_SEC_AT_2000 = 50;
-  const FIELD_IMAGE_ROTATE_180 = true;
+  const RENDER_FLIP_X = true;
+  const RENDER_FLIP_Y = true;
 
   const playback = {
     isPlaying: false,
@@ -470,6 +471,15 @@
   function headingFromVector(dx, dy) {
     // RR/Pose2d convention: 0° = +y (up), +90° = -x (left)
     return Math.atan2(-dx, dy) * 180 / Math.PI;
+  }
+
+  function mapHeadingForRender(headingDeg) {
+    const hRad = headingDeg * Math.PI / 180;
+    let dx = -Math.sin(hRad); // RR heading to direction vector
+    let dy =  Math.cos(hRad);
+    if (RENDER_FLIP_X) dx *= -1;
+    if (RENDER_FLIP_Y) dy *= -1;
+    return headingFromVector(dx, dy);
   }
 
   function getDriveWaypoints(card) {
@@ -1283,7 +1293,8 @@ ${pathBody}
     ctx.save();
     ctx.translate(cx, cy);
     if (doRotate) {
-      const hRad = -(headingDeg + 90) * Math.PI / 180;
+      const renderHeading = mapHeadingForRender(headingDeg);
+      const hRad = -(renderHeading + 90) * Math.PI / 180;
       ctx.rotate(hRad);
     }
     if (fillStyle) {
@@ -1301,7 +1312,8 @@ ${pathBody}
     const [cx, cy] = toC(fx, fy);
     const w = (sizeIn / FIELD_SIZE_IN) * ctx.canvas.width;
     const h = (sizeIn / FIELD_SIZE_IN) * ctx.canvas.height;
-    const hRad = -(headingDeg + 90) * Math.PI / 180;
+    const renderHeading = mapHeadingForRender(headingDeg);
+    const hRad = -(renderHeading + 90) * Math.PI / 180;
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(hRad);
@@ -1317,25 +1329,24 @@ ${pathBody}
     const W = canvas.width, H = canvas.height;
 
     // Field coords: -72..72 on both axes, y increases upward.
-    // Map display mirrors points across X-axis.
+    // Rendering applies optional axis flips without changing underlying data.
     function toC(fx, fy) {
-      const my = mirrorMapY(fy);
-      return [(fx - FIELD_MIN) / FIELD_SIZE_IN * W, (FIELD_MAX - my) / FIELD_SIZE_IN * H];
+      let mx = fx;
+      let my = mirrorMapY(fy);
+      if (RENDER_FLIP_X) mx = -mx;
+      if (RENDER_FLIP_Y) my = -my;
+      return [(mx - FIELD_MIN) / FIELD_SIZE_IN * W, (FIELD_MAX - my) / FIELD_SIZE_IN * H];
     }
 
     ctx.clearRect(0, 0, W, H);
 
     // ── Background: FTC field photo ──
     if (fieldImg.complete && fieldImg.naturalWidth > 0) {
-      if (FIELD_IMAGE_ROTATE_180) {
-        ctx.save();
-        ctx.translate(W, H);
-        ctx.rotate(Math.PI);
-        ctx.drawImage(fieldImg, 0, 0, W, H);
-        ctx.restore();
-      } else {
-        ctx.drawImage(fieldImg, 0, 0, W, H);
-      }
+      ctx.save();
+      ctx.translate(RENDER_FLIP_X ? W : 0, RENDER_FLIP_Y ? H : 0);
+      ctx.scale(RENDER_FLIP_X ? -1 : 1, RENDER_FLIP_Y ? -1 : 1);
+      ctx.drawImage(fieldImg, 0, 0, W, H);
+      ctx.restore();
       // Darken slightly so overlays read clearly
       ctx.fillStyle = 'rgba(0,0,0,0.28)';
       ctx.fillRect(0, 0, W, H);
@@ -1407,7 +1418,8 @@ ${pathBody}
       ctx.beginPath(); ctx.arc(cx, cy, 11, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.shadowBlur = 0;
       // Heading arrow: 0=up(+y), CW positive → canvas angle = (h - 90)°
-      const hRad = -(pose.heading + 90) * Math.PI / 180;
+      const renderHeading = mapHeadingForRender(pose.heading);
+      const hRad = -(renderHeading + 90) * Math.PI / 180;
       const aLen = 22;
       ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5;
       ctx.beginPath(); ctx.moveTo(cx, cy);
@@ -1540,7 +1552,8 @@ ${pathBody}
       const [cx, cy] = toC(playbackPose.x, playbackPose.y);
       drawRobotSprite(ctx, toC, playbackPose.x, playbackPose.y, playbackPose.heading);
       drawRobotBox(ctx, toC, playbackPose.x, playbackPose.y, '#88ffd2', 'rgba(136,255,210,0.18)', playbackPose.heading);
-      const hRad = -(playbackPose.heading + 90) * Math.PI / 180;
+      const renderHeading = mapHeadingForRender(playbackPose.heading);
+      const hRad = -(renderHeading + 90) * Math.PI / 180;
       const aLen = 24;
       ctx.strokeStyle = '#88ffd2';
       ctx.lineWidth = 3;
