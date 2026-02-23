@@ -86,7 +86,7 @@
       min-width: 0;
     }
     .right-col {
-      flex: 0 0 460px;
+      flex: 0 0 690px;
     }
     .canvas-sticky {
       position: sticky;
@@ -281,13 +281,15 @@
 <div class="right-col">
   <div class="canvas-sticky">
     <h2>Field Preview</h2>
-    <canvas id="fieldCanvas" width="450" height="450"></canvas>
+    <canvas id="fieldCanvas" width="650" height="650"></canvas>
     <div class="field-legend">
       <div class="legend-item"><div class="legend-dot" style="background:#5e81ac;border:2px solid #fff"></div><span>Start</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:#485d97;opacity:0.6"></div><span>Named point</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:#88c0d0"></div><span>Drive step 1</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:#a3be8c"></div><span>Drive step 2</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#88c0d0"></div><span>Drive</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:#ebcb8b"></div><span>Turn</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#bf616a"></div><span>⚡ Shoot</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#81a1c1"></div><span>⏸ Wait</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#d08770"></div><span>↺ Transfer</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ebcb8b"></div><span>◎ Aim</span></div>
     </div>
   </div>
 </div><!-- .right-col -->
@@ -869,6 +871,11 @@ ${pathBody}
 
   const FIELD_COLORS = ['#88c0d0','#a3be8c','#d08770','#bf616a','#b48ead','#8fbcbb','#81a1c1'];
 
+  // Pre-load field image once
+  const fieldImg = new Image();
+  fieldImg.src = 'field.webp';
+  fieldImg.onload = renderField;
+
   function renderField() {
     const canvas = document.getElementById('fieldCanvas');
     if (!canvas) return;
@@ -876,26 +883,34 @@ ${pathBody}
     const W = canvas.width, H = canvas.height;
 
     // Field coords: -72..72 on both axes, y increases upward.
-    // Canvas coords: (0,0) = top-left, y increases downward.
+    // Canvas: (0,0)=top-left, y increases downward.
     function toC(fx, fy) {
       return [(fx + 72) / 144 * W, (72 - fy) / 144 * H];
     }
 
     ctx.clearRect(0, 0, W, H);
 
-    // Draw alternating tiles (6×6 grid of 24" tiles)
-    for (let row = 0; row < 6; row++) {
-      for (let col = 0; col < 6; col++) {
-        const [cx, cy] = toC(-72 + col * 24, 72 - row * 24);
-        const tw = 24 / 144 * W, th = 24 / 144 * H;
-        ctx.fillStyle = (row + col) % 2 === 0 ? '#272727' : '#1f1f1f';
-        ctx.fillRect(cx, cy, tw + 0.5, th + 0.5);
+    // ── Background: FTC field photo ──
+    if (fieldImg.complete && fieldImg.naturalWidth > 0) {
+      ctx.drawImage(fieldImg, 0, 0, W, H);
+      // Darken slightly so overlays read clearly
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      // Fallback grid while image loads
+      for (let row = 0; row < 6; row++) {
+        for (let col = 0; col < 6; col++) {
+          const [cx, cy] = toC(-72 + col * 24, 72 - row * 24);
+          const tw = 24 / 144 * W, th = 24 / 144 * H;
+          ctx.fillStyle = (row + col) % 2 === 0 ? '#272727' : '#1f1f1f';
+          ctx.fillRect(cx, cy, tw + 0.5, th + 0.5);
+        }
       }
     }
 
-    // Tile grid lines
-    ctx.strokeStyle = '#383838';
-    ctx.lineWidth = 0.5;
+    // Tile grid overlay (subtle white lines)
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+    ctx.lineWidth = 0.75;
     for (let i = -72; i <= 72; i += 24) {
       const [x1, y1] = toC(i, -72), [x2, y2] = toC(i, 72);
       ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
@@ -903,71 +918,71 @@ ${pathBody}
       ctx.beginPath(); ctx.moveTo(x3, y3); ctx.lineTo(x4, y4); ctx.stroke();
     }
 
-    // Center axes
-    ctx.strokeStyle = '#4a4a4a';
+    // Centre axes (slightly brighter)
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
     ctx.lineWidth = 1;
-    const [ax1, ay1] = toC(0, -72), [ax2, ay2] = toC(0, 72);
-    ctx.beginPath(); ctx.moveTo(ax1, ay1); ctx.lineTo(ax2, ay2); ctx.stroke();
-    const [ax3, ay3] = toC(-72, 0), [ax4, ay4] = toC(72, 0);
-    ctx.beginPath(); ctx.moveTo(ax3, ay3); ctx.lineTo(ax4, ay4); ctx.stroke();
+    { const [x1,y1]=toC(0,-72),[x2,y2]=toC(0,72); ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
+    { const [x1,y1]=toC(-72,0),[x2,y2]=toC(72,0); ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
 
     // Field border
-    ctx.strokeStyle = '#888';
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
     ctx.lineWidth = 2;
     ctx.strokeRect(1, 1, W - 2, H - 2);
 
     // Axis labels
-    ctx.fillStyle = '#555';
-    ctx.font = '10px Arial';
-    ctx.fillText('+y', ...toC(2, 68));
-    ctx.fillText('-y', ...toC(2, -70));
-    ctx.fillText('+x', ...toC(62, 4));
-    ctx.fillText('-x', ...toC(-71, 4));
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.font = '11px Arial';
+    ctx.fillText('+y', ...toC(2, 66)); ctx.fillText('-y', ...toC(2, -69));
+    ctx.fillText('+x', ...toC(60, 3)); ctx.fillText('-x', ...toC(-71, 3));
 
     const key = getKey();
 
-    // Known points
+    // Known points (white translucent dots + labels)
     (KNOWN_POINTS[key] || []).forEach(pt => {
       const [cx, cy] = toC(pt.x, pt.y);
-      ctx.fillStyle = '#485d9766';
-      ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#888';
+      ctx.fillStyle = 'rgba(255,255,255,0.20)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.50)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.65)';
       ctx.font = '9px Arial';
       ctx.fillText(pt.label, cx + 7, cy + 3);
     });
 
-    // Start pose
+    // ── Start pose ──
     const pose = START_POSES[key];
     let px = pose.x, py = pose.y;
     {
       const [cx, cy] = toC(px, py);
+      // Glow ring
+      ctx.shadowColor = '#5e81ac'; ctx.shadowBlur = 12;
       ctx.fillStyle = '#5e81ac';
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-
-      // Heading arrow: convention 0=up (+y), CW positive (compass-like)
-      // Canvas angle (from +x, CW): (heading_deg - 90) * π/180
-      const hRad = (pose.heading - 90) * Math.PI / 180;
-      const aLen = 18;
-      ctx.strokeStyle = '#fff';
+      ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + aLen * Math.cos(hRad), cy + aLen * Math.sin(hRad));
-      ctx.stroke();
-
-      ctx.fillStyle = '#aaa';
-      ctx.font = 'bold 9px Arial';
-      ctx.fillText('S', cx - 3, cy + 3);
+      ctx.beginPath(); ctx.arc(cx, cy, 11, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.shadowBlur = 0;
+      // Heading arrow: 0=up(+y), CW positive → canvas angle = (h - 90)°
+      const hRad = (pose.heading - 90) * Math.PI / 180;
+      const aLen = 22;
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + aLen * Math.cos(hRad), cy + aLen * Math.sin(hRad)); ctx.stroke();
+      // "S" label
+      ctx.fillStyle = '#ffffff'; ctx.font = 'bold 10px Arial';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('S', cx, cy);
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
     }
 
-    // Draw path steps
+    // ── Draw each step ──
     let colorIdx = 0;
+    let samePosCnt = 0; // tracks consecutive stationary steps for stacking markers
+
     document.querySelectorAll('.step-card').forEach((card, i) => {
       const type = card.querySelector('.step-type').value;
       const color = FIELD_COLORS[colorIdx % FIELD_COLORS.length];
 
+      // ── Drive / Drive + Turn ──
       if (type === 'Drive' || type === 'Drive + Turn') {
         const wpRows = card.querySelectorAll('.waypoint-row');
         const pts = [];
@@ -978,80 +993,165 @@ ${pathBody}
         });
 
         if (pts.length > 0) {
-          // Path line from previous position through all waypoints
-          ctx.strokeStyle = color;
-          ctx.lineWidth = 2.5;
-          ctx.setLineDash([]);
-          ctx.beginPath();
-          ctx.moveTo(...toC(px, py));
-          pts.forEach(([fx, fy]) => ctx.lineTo(...toC(fx, fy)));
-          ctx.stroke();
+          const allField = [[px, py], ...pts];
+          const allC = allField.map(([fx, fy]) => toC(fx, fy));
 
-          // Arrowhead at final waypoint
-          const prev = pts.length > 1 ? pts[pts.length - 2] : [px, py];
-          const last = pts[pts.length - 1];
-          drawArrow(ctx, toC(prev[0], prev[1]), toC(last[0], last[1]), color);
+          // Draw glow shadow for path
+          ctx.shadowColor = color; ctx.shadowBlur = 8;
+          ctx.strokeStyle = color; ctx.lineWidth = 3.5;
+          ctx.setLineDash([]); ctx.lineJoin = 'round';
+          drawCatmullRom(ctx, allC);
+          ctx.shadowBlur = 0;
 
-          // Waypoint dots
+          // Arrowhead — tangent direction at last segment end
+          const n = allC.length;
+          const prevC = allC[n - 2], lastC = allC[n - 1];
+          drawArrow(ctx, prevC, lastC, color);
+
+          // Intermediate waypoint dots (skip first = previous robot pos)
           pts.forEach(([fx, fy]) => {
             const [cx, cy] = toC(fx, fy);
-            ctx.fillStyle = color;
-            ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = color; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
           });
 
-          // Step number label near last waypoint
-          const [lx, ly] = toC(last[0], last[1]);
-          ctx.fillStyle = '#fff';
-          ctx.font = 'bold 10px Arial';
-          ctx.fillText(i + 1, lx + 6, ly - 3);
+          // Step number badge near endpoint
+          const [lx, ly] = toC(pts[pts.length - 1][0], pts[pts.length - 1][1]);
+          ctx.fillStyle = 'rgba(0,0,0,0.65)';
+          ctx.fillRect(lx + 7, ly - 16, 18, 14);
+          ctx.fillStyle = color; ctx.font = 'bold 11px Arial';
+          ctx.fillText(i + 1, lx + 10, ly - 6);
 
-          px = last[0]; py = last[1];
+          px = pts[pts.length - 1][0]; py = pts[pts.length - 1][1];
         }
 
-        // Turn indicator for Drive+Turn
+        // Turn arc for Drive+Turn
         if (type === 'Drive + Turn') {
+          const angleDeg = parseFloat(card.querySelector('.p-dt-angle')?.value || '0');
           const [cx, cy] = toC(px, py);
-          ctx.strokeStyle = '#ebcb8b';
-          ctx.lineWidth = 1.5;
-          ctx.setLineDash([3, 3]);
+          const sweep = Math.min(Math.abs(angleDeg), 300) * Math.PI / 180;
+          ctx.strokeStyle = '#ebcb8b'; ctx.lineWidth = 2;
+          ctx.setLineDash([4, 4]);
           ctx.beginPath();
-          ctx.arc(cx, cy, 14, -Math.PI * 0.5, Math.PI * 0.3);
-          ctx.stroke();
-          ctx.setLineDash([]);
+          ctx.arc(cx, cy, 18, -Math.PI / 2, -Math.PI / 2 + (angleDeg >= 0 ? sweep : -sweep), angleDeg < 0);
+          ctx.stroke(); ctx.setLineDash([]);
+          ctx.fillStyle = '#ebcb8b'; ctx.font = 'bold 9px Arial';
+          ctx.fillText(`↻${angleDeg}°`, cx + 21, cy - 6);
         }
 
         colorIdx++;
+        samePosCnt = 0;
 
+      // ── Turn ──
       } else if (type === 'Turn') {
         const [cx, cy] = toC(px, py);
         const angleDeg = parseFloat(card.querySelector('.p-turn-angle')?.value || '0');
-        ctx.strokeStyle = '#ebcb8b';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([3, 3]);
+        const sweep = Math.min(Math.abs(angleDeg), 300) * Math.PI / 180;
+        ctx.shadowColor = '#ebcb8b'; ctx.shadowBlur = 6;
+        ctx.strokeStyle = '#ebcb8b'; ctx.lineWidth = 2.5;
+        ctx.setLineDash([4, 4]);
         ctx.beginPath();
-        const sweep = Math.min(Math.abs(angleDeg), 270) * Math.PI / 180;
-        ctx.arc(cx, cy, 14, -Math.PI / 2, -Math.PI / 2 + (angleDeg >= 0 ? sweep : -sweep), angleDeg < 0);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        ctx.arc(cx, cy, 18, -Math.PI / 2, -Math.PI / 2 + (angleDeg >= 0 ? sweep : -sweep), angleDeg < 0);
+        ctx.stroke(); ctx.setLineDash([]); ctx.shadowBlur = 0;
+        // Arrow tip on arc
+        const endAng = -Math.PI / 2 + (angleDeg >= 0 ? sweep : -sweep);
+        const tipX = cx + 18 * Math.cos(endAng), tipY = cy + 18 * Math.sin(endAng);
+        const tipDir = endAng + (angleDeg >= 0 ? Math.PI / 2 : -Math.PI / 2);
         ctx.fillStyle = '#ebcb8b';
-        ctx.font = '9px Arial';
-        ctx.fillText(`T${i + 1}(${angleDeg}°)`, cx + 17, cy - 2);
+        ctx.beginPath();
+        ctx.moveTo(tipX, tipY);
+        ctx.lineTo(tipX - 7 * Math.cos(tipDir - 0.5), tipY - 7 * Math.sin(tipDir - 0.5));
+        ctx.lineTo(tipX - 7 * Math.cos(tipDir + 0.5), tipY - 7 * Math.sin(tipDir + 0.5));
+        ctx.fill();
+        ctx.fillStyle = '#ebcb8b'; ctx.font = 'bold 9px Arial';
+        ctx.fillText(`↻${angleDeg}°`, cx + 22, cy - 8);
+        // Step badge
+        ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(cx - 23, cy - 30, 18, 13);
+        ctx.fillStyle = '#ebcb8b'; ctx.font = 'bold 10px Arial';
+        ctx.fillText(i + 1, cx - 19, cy - 21);
         colorIdx++;
+        samePosCnt = 0;
+
+      // ── Action markers (Shoot, Wait, Transfer, Aim Turret) ──
+      } else {
+        const [cx, cy] = toC(px, py);
+        const ox = samePosCnt * 30; // horizontal offset to avoid stacking
+
+        if (type === 'Shoot') {
+          drawActionMarker(ctx, cx + ox, cy, '#bf616a', '⚡', i + 1, 'SHOOT');
+        } else if (type === 'Wait') {
+          const ms = card.querySelector('.p-wait-ms')?.value || '?';
+          drawActionMarker(ctx, cx + ox, cy, '#81a1c1', '⏸', i + 1, `${ms}ms`);
+        } else if (type === 'Transfer') {
+          drawActionMarker(ctx, cx + ox, cy, '#d08770', '↺', i + 1, 'XFER');
+        } else if (type === 'Aim Turret') {
+          drawActionMarker(ctx, cx + ox, cy, '#ebcb8b', '◎', i + 1, 'AIM');
+        }
+        samePosCnt++;
       }
-      // Wait / Shoot / Transfer / Aim Turret: no movement, skip
     });
+  }
+
+  // Catmull-Rom spline through canvas points
+  function drawCatmullRom(ctx, pts) {
+    if (pts.length < 2) return;
+    const STEPS = 32, n = pts.length;
+    ctx.beginPath();
+    let started = false;
+    for (let i = 0; i < n - 1; i++) {
+      const p0 = pts[Math.max(0, i - 1)];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[Math.min(n - 1, i + 2)];
+      for (let j = 0; j <= STEPS; j++) {
+        const t = j / STEPS, t2 = t * t, t3 = t2 * t;
+        const x = 0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3);
+        const y = 0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3);
+        if (!started) { ctx.moveTo(x, y); started = true; } else { ctx.lineTo(x, y); }
+      }
+    }
+    ctx.stroke();
   }
 
   function drawArrow(ctx, [x1, y1], [x2, y2], color) {
     const angle = Math.atan2(y2 - y1, x2 - x1);
-    const len = 10;
+    const len = 12;
+    ctx.shadowColor = color; ctx.shadowBlur = 6;
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.moveTo(x2, y2);
     ctx.lineTo(x2 - len * Math.cos(angle - Math.PI / 6), y2 - len * Math.sin(angle - Math.PI / 6));
     ctx.lineTo(x2 - len * Math.cos(angle + Math.PI / 6), y2 - len * Math.sin(angle + Math.PI / 6));
-    ctx.closePath();
-    ctx.fill();
+    ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  function drawActionMarker(ctx, cx, cy, color, icon, stepNum, label) {
+    const R = 13;
+    // Glow + filled circle
+    ctx.shadowColor = color; ctx.shadowBlur = 10;
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+    // Icon
+    ctx.fillStyle = '#ffffff'; ctx.font = '12px Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(icon, cx, cy);
+    // Step number badge (top-right)
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.beginPath(); ctx.arc(cx + R - 1, cy - R + 1, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 8px Arial';
+    ctx.fillText(stepNum, cx + R - 1, cy - R + 1);
+    // Label below
+    ctx.font = 'bold 9px Arial';
+    const lw = ctx.measureText(label).width + 8;
+    ctx.fillStyle = 'rgba(0,0,0,0.70)';
+    ctx.fillRect(cx - lw / 2, cy + R + 3, lw, 14);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(label, cx, cy + R + 11);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   }
 
   // ── Event wiring ───────────────────────────────────────────────────────────
