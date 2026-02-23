@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Deocde Auto Generator</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+  <style>
+    body {
+      background-color: #ffffff;
+      color: #000000;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+    h1, h2 { color: #485d97; }
+    label { display: block; margin-top: 10px; }
+
+    input[type="text"],
+    input[type="number"],
+    select {
+      border: 1px solid #444;
+      padding: 6px 8px;
+      margin-top: 4px;
+      border-radius: 4px;
+      background-color: #e0e0e0;
+      color: #000;
+    }
+    input:disabled, select:disabled {
+      background-color: #ffffff;
+      color: #000;
+    }
+
+    button {
+      cursor: pointer;
+      background-color: #5e81ac;
+      border: none;
+      color: #ffffff;
+      border-radius: 4px;
+      padding: 8px 14px;
+      margin-top: 6px;
+    }
+    button:hover { background-color: #81a1c1; }
+    button.danger { background-color: #bf616a; }
+    button.danger:hover { background-color: #d08770; }
+    button.small { padding: 3px 8px; font-size: 12px; margin-top: 0; }
+
+    .params-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .params-grid label { margin-top: 0; }
+
+    .field-row {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      margin-top: 8px;
+    }
+    .field-row label { margin-top: 0; }
+
+    .section-box {
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 14px;
+      margin-top: 14px;
+    }
+    .section-box-title {
+      font-weight: bold;
+      color: #485d97;
+      margin-bottom: 8px;
+    }
+
+    /* Step cards */
+    #steps { margin-top: 12px; }
+    .step-card {
+      border: 1px solid #b0b0b0;
+      border-radius: 6px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      background: #f5f5f5;
+      position: relative;
+    }
+    .step-card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #485d97;
+      color: #fff;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    .step-card .del-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background-color: #bf616a;
+      padding: 4px 10px;
+      font-size: 12px;
+      margin-top: 0;
+    }
+    .step-card .del-btn:hover { background-color: #d08770; }
+
+    .waypoint-list { margin-top: 6px; }
+    .waypoint-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin: 4px 0;
+    }
+    .waypoint-row input { width: 80px; margin-top: 0; }
+    .waypoint-row span { color: #555; }
+
+    /* Output */
+    #outputContainer {
+      background-color: #1e1e1e;
+      padding: 10px;
+      border-radius: 6px;
+      margin-top: 10px;
+      overflow: auto;
+      max-height: 600px;
+    }
+    pre[class*="language-"] {
+      background: #1e1e1e !important;
+      border: none !important;
+      box-shadow: none !important;
+      border-radius: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      line-height: 1.5 !important;
+      white-space: pre !important;
+      overflow: visible !important;
+    }
+    code[class*="language-"] {
+      background: none !important;
+      font-family: Consolas, Monaco, 'Courier New', monospace !important;
+      font-size: 13px !important;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Deocde Robotics Auto Generator</h1>
+
+<h2>Step 1: Setup</h2>
+
+<label>Auto Class Name:
+  <input type="text" id="autoName" placeholder="MyAuto" style="width:220px">
+</label>
+
+<div class="field-row" style="margin-top:12px">
+  <label>Alliance:
+    <select id="alliance">
+      <option value="BLUE">Blue</option>
+      <option value="RED">Red</option>
+    </select>
+  </label>
+  <label>Start Position:
+    <select id="startPos">
+      <option value="CLOSE">Close</option>
+      <option value="FAR">Far</option>
+    </select>
+  </label>
+</div>
+
+<div class="section-box">
+  <div class="section-box-title">Shooter Velocity (RPM)</div>
+  <div class="params-grid">
+    <label>Left: <input type="number" id="veloL" value="1150"></label>
+    <label>Middle: <input type="number" id="veloM" value="1150"></label>
+    <label>Right: <input type="number" id="veloR" value="1150"></label>
+  </div>
+</div>
+
+<div class="section-box">
+  <div class="section-box-title">Hood Angles (degrees)</div>
+  <div class="params-grid">
+    <label>Left: <input type="number" id="hoodL" value="30"></label>
+    <label>Middle: <input type="number" id="hoodM" value="30"></label>
+    <label>Right: <input type="number" id="hoodR" value="30"></label>
+  </div>
+</div>
+
+<div class="section-box">
+  <div class="section-box-title">Turret</div>
+  <label>Shooting Angle — field-centric (degrees):
+    <input type="number" id="turretAngle" value="142" style="width:100px">
+  </label>
+  <label>Pre-aim Angle — robot-centric (degrees):
+    <input type="number" id="preAimAngle" value="-90" style="width:100px">
+  </label>
+</div>
+
+<h2>Step 2: Path Steps</h2>
+<p style="margin:4px 0 8px 0; color:#555; font-size:14px">
+  Each step maps directly to a chained call on <code>SixWheelPIDPathBuilder</code>.
+  Steps execute in order.
+</p>
+<div id="steps"></div>
+<button onclick="addStep()">+ Add Step</button>
+
+<h2>Generated Auto Class</h2>
+<div id="outputContainer">
+  <pre><code id="output" class="language-java"></code></pre>
+</div>
+<button id="copyBtn" style="margin-top:10px">Copy to Clipboard</button>
+
+<script>
+  // ── Constants ──────────────────────────────────────────────────────────────
+
+  const START_POSES = {
+    BLUE_CLOSE: { x: -49, y: -54, heading: 51.529 },
+    BLUE_FAR:   { x:  63, y:  -7, heading: -90     },
+    RED_CLOSE:  { x: -51, y:  54, heading: -51.529 },
+    RED_FAR:    { x:  63, y:   7, heading:  90     }
+  };
+
+  const DEFAULTS = {
+    BLUE_CLOSE: { veloL: 1150, veloM: 1150, veloR: 1150, hoodL: 30, hoodM: 30, hoodR: 30, turret: 142,  preAim: -90  },
+    BLUE_FAR:   { veloL: 1440, veloM: 1440, veloR: 1430, hoodL: 49, hoodM: 45, hoodR: 49, turret: 156,  preAim: -116 },
+    RED_CLOSE:  { veloL: 1120, veloM: 1120, veloR: 1120, hoodL: 34, hoodM: 34, hoodR: 34, turret: 223,  preAim:  90  },
+    RED_FAR:    { veloL: 1440, veloM: 1440, veloR: 1440, hoodL: 49, hoodM: 45, hoodR: 49, turret: 201,  preAim:  116 }
+  };
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  function getKey() {
+    return document.getElementById('alliance').value + '_' + document.getElementById('startPos').value;
+  }
+
+  function sanitize(raw) {
+    let n = raw.trim().replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/_+$/, '');
+    return n.length > 0 ? n[0].toUpperCase() + n.slice(1) : 'MyAuto';
+  }
+
+  function applyDefaults() {
+    const d = DEFAULTS[getKey()];
+    if (!d) return;
+    document.getElementById('veloL').value = d.veloL;
+    document.getElementById('veloM').value = d.veloM;
+    document.getElementById('veloR').value = d.veloR;
+    document.getElementById('hoodL').value = d.hoodL;
+    document.getElementById('hoodM').value = d.hoodM;
+    document.getElementById('hoodR').value = d.hoodR;
+    document.getElementById('turretAngle').value = d.turret;
+    document.getElementById('preAimAngle').value = d.preAim;
+    regenerate();
+  }
+
+  // ── Step management ────────────────────────────────────────────────────────
+
+  let stepCounter = 0;
+
+  function addStep() {
+    stepCounter++;
+    const card = document.createElement('div');
+    card.className = 'step-card';
+
+    // Header row
+    const header = document.createElement('div');
+    header.className = 'step-card-header';
+
+    const numBadge = document.createElement('span');
+    numBadge.className = 'step-num';
+
+    const typeSelect = document.createElement('select');
+    typeSelect.className = 'step-type';
+    ['Drive', 'Turn', 'Wait', 'Shoot', 'Transfer', 'Aim Turret'].forEach(t => {
+      const o = document.createElement('option');
+      o.value = t; o.textContent = t;
+      typeSelect.appendChild(o);
+    });
+
+    header.appendChild(numBadge);
+    header.appendChild(typeSelect);
+    card.appendChild(header);
+
+    // Params area
+    const params = document.createElement('div');
+    params.className = 'step-params';
+    card.appendChild(params);
+
+    // Delete button
+    const del = document.createElement('button');
+    del.textContent = 'Delete';
+    del.className = 'del-btn';
+    del.onclick = () => { card.remove(); renumber(); regenerate(); };
+    card.appendChild(del);
+
+    typeSelect.onchange = () => { renderParams(typeSelect.value, params); regenerate(); };
+    renderParams(typeSelect.value, params);
+
+    document.getElementById('steps').appendChild(card);
+    renumber();
+    regenerate();
+  }
+
+  function renumber() {
+    document.querySelectorAll('.step-card .step-num').forEach((el, i) => {
+      el.textContent = i + 1;
+    });
+  }
+
+  // ── Param renderers ────────────────────────────────────────────────────────
+
+  function renderParams(type, container) {
+    container.innerHTML = '';
+
+    if (type === 'Drive') {
+      const veloRow = document.createElement('div');
+      veloRow.innerHTML = '<label>Max Velocity: <input type="number" class="p-velo" value="2000" style="width:100px"> <span style="color:#555;font-size:13px">(ticks/s)</span></label>';
+      veloRow.querySelector('.p-velo').oninput = regenerate;
+      container.appendChild(veloRow);
+
+      const wpSection = document.createElement('div');
+      wpSection.style.marginTop = '10px';
+
+      const wpTitle = document.createElement('div');
+      wpTitle.style.cssText = 'font-size:13px;color:#333;margin-bottom:4px';
+      wpTitle.textContent = 'Waypoints (x, y) — in order:';
+      wpSection.appendChild(wpTitle);
+
+      const wpList = document.createElement('div');
+      wpList.className = 'waypoint-list';
+      wpSection.appendChild(wpList);
+
+      const addBtn = document.createElement('button');
+      addBtn.className = 'small';
+      addBtn.textContent = '+ Waypoint';
+      addBtn.style.marginTop = '6px';
+      addBtn.onclick = e => { e.preventDefault(); addWaypoint(wpList); regenerate(); };
+      wpSection.appendChild(addBtn);
+
+      container.appendChild(wpSection);
+      addWaypoint(wpList);
+      addWaypoint(wpList);
+
+    } else if (type === 'Turn') {
+      const div = document.createElement('div');
+      div.className = 'field-row';
+      div.innerHTML = `
+        <label>Angle (°): <input type="number" class="p-turn-angle" value="-90" style="width:90px"></label>
+        <label>Timeout (ms): <input type="number" class="p-turn-timeout" value="1000" style="width:90px"></label>`;
+      div.querySelector('.p-turn-angle').oninput = regenerate;
+      div.querySelector('.p-turn-timeout').oninput = regenerate;
+      container.appendChild(div);
+
+    } else if (type === 'Wait') {
+      const div = document.createElement('div');
+      div.innerHTML = '<label>Duration (ms): <input type="number" class="p-wait-ms" value="500" style="width:100px"></label>';
+      div.querySelector('.p-wait-ms').oninput = regenerate;
+      container.appendChild(div);
+
+    } else if (type === 'Shoot') {
+      const div = document.createElement('div');
+      div.innerHTML = `
+        <label style="margin-top:4px"><input type="checkbox" class="p-antijam"> Use <code>AutonomousShootAntiJamCommand</code> instead of normal shoot</label>
+        <label style="margin-top:6px"><input type="checkbox" class="p-spit"> Spit intake after shoot (WaitCommand 300ms + IntakeSpitCommand)</label>`;
+      div.querySelector('.p-antijam').onchange = regenerate;
+      div.querySelector('.p-spit').onchange = regenerate;
+      container.appendChild(div);
+
+    } else if (type === 'Transfer') {
+      const div = document.createElement('div');
+      div.innerHTML = `
+        <label>Wait after transfer (ms): <input type="number" class="p-tf-wait" value="1000" style="width:100px"></label>
+        <label style="margin-top:6px"><input type="checkbox" class="p-preaim"> Pre-aim turret after transfer (<code>TurnTurretToPosCommand(preAimTurretAngle)</code>)</label>`;
+      div.querySelector('.p-tf-wait').oninput = regenerate;
+      div.querySelector('.p-preaim').onchange = regenerate;
+      container.appendChild(div);
+
+    } else if (type === 'Aim Turret') {
+      const div = document.createElement('div');
+      div.innerHTML = `
+        <label>Mode:
+          <select class="p-aim-mode">
+            <option value="field_stored">Field-centric — use stored <code>turretAngle</code></option>
+            <option value="field_custom">Field-centric — custom angle</option>
+            <option value="robot_stored">Robot-centric — use stored <code>preAimTurretAngle</code></option>
+            <option value="robot_custom">Robot-centric — custom angle</option>
+          </select>
+        </label>
+        <label class="custom-angle-row" style="display:none;margin-top:8px">
+          Custom Angle (°): <input type="number" class="p-aim-angle" value="0" style="width:90px">
+        </label>`;
+      const modeSelect = div.querySelector('.p-aim-mode');
+      const customRow = div.querySelector('.custom-angle-row');
+      modeSelect.onchange = () => {
+        customRow.style.display = modeSelect.value.includes('custom') ? 'block' : 'none';
+        regenerate();
+      };
+      div.querySelector('.p-aim-angle').oninput = regenerate;
+      container.appendChild(div);
+    }
+  }
+
+  function addWaypoint(list) {
+    const row = document.createElement('div');
+    row.className = 'waypoint-row';
+
+    const xIn = document.createElement('input');
+    xIn.type = 'number'; xIn.placeholder = 'x'; xIn.className = 'wp-x'; xIn.oninput = regenerate;
+
+    const yIn = document.createElement('input');
+    yIn.type = 'number'; yIn.placeholder = 'y'; yIn.className = 'wp-y'; yIn.oninput = regenerate;
+
+    const rm = document.createElement('button');
+    rm.textContent = '×'; rm.className = 'danger small';
+    rm.onclick = e => { e.preventDefault(); row.remove(); regenerate(); };
+
+    row.appendChild(document.createTextNode('x: ')); row.appendChild(xIn);
+    row.appendChild(document.createTextNode('  y: ')); row.appendChild(yIn);
+    row.appendChild(rm);
+    list.appendChild(row);
+  }
+
+  // ── Code generation ────────────────────────────────────────────────────────
+
+  // Indentation constants (spaces from left margin in generated Java)
+  // Inner class constructor body = 12 spaces
+  // Chain method calls           = 20 spaces  (12 + 8)
+  // Callback body                = 24 spaces  (20 + 4)
+  // SequentialCommandGroup args  = 32 spaces  (24 + 8)
+  const IND_CHAIN  = '                    ';   // 20 sp
+  const IND_CB     = '                        '; // 24 sp
+  const IND_ARGS   = '                                '; // 32 sp
+
+  function buildSegment(card) {
+    const type = card.querySelector('.step-type').value;
+
+    if (type === 'Drive') {
+      const velo = card.querySelector('.p-velo')?.value || '2000';
+      const wpRows = card.querySelectorAll('.waypoint-row');
+      if (wpRows.length === 0) return null;
+      const pts = Array.from(wpRows).map(r => {
+        const x = r.querySelector('.wp-x').value || '0';
+        const y = r.querySelector('.wp-y').value || '0';
+        return `${IND_CHAIN}        new Point2d(${x}, ${y})`;
+      });
+      return `.addPurePursuitPath(new Point2d[]{\n${pts.join(',\n')}\n${IND_CHAIN}}, ${velo})`;
+
+    } else if (type === 'Turn') {
+      const angle   = card.querySelector('.p-turn-angle')?.value   || '0';
+      const timeout = card.querySelector('.p-turn-timeout')?.value || '1000';
+      return `.addTurnTo(${angle}, ${timeout})`;
+
+    } else if (type === 'Wait') {
+      const ms = card.querySelector('.p-wait-ms')?.value || '500';
+      return `.waitMilliseconds(${ms})`;
+
+    } else if (type === 'Shoot') {
+      const antiJam = card.querySelector('.p-antijam')?.checked;
+      const spit    = card.querySelector('.p-spit')?.checked;
+      const cmd = antiJam ? 'new AutonomousShootAntiJamCommand()' : 'new AutonomousShootCommand()';
+      if (spit) {
+        return `.callback(() -> {\n${IND_CB}new SequentialCommandGroup(\n${IND_ARGS}${cmd},\n${IND_ARGS}new WaitCommand(300),\n${IND_ARGS}new IntakeSpitCommand()\n${IND_CB}).schedule();\n${IND_CHAIN}})`;
+      }
+      return `.callback(() -> {\n${IND_CB}new SequentialCommandGroup(\n${IND_ARGS}${cmd}\n${IND_CB}).schedule();\n${IND_CHAIN}})`;
+
+    } else if (type === 'Transfer') {
+      const waitMs = card.querySelector('.p-tf-wait')?.value || '1000';
+      const preAim = card.querySelector('.p-preaim')?.checked;
+      const cmds = [
+        'new SetShooterVelocityIndependentCommand(velo, veloMiddle, velo)',
+        'new AutonomousTransferCommand(leftHood, middleHood, rightHood)'
+      ];
+      if (parseInt(waitMs) > 0) cmds.push(`new WaitCommand(${waitMs})`);
+      if (preAim)               cmds.push('new TurnTurretToPosCommand(preAimTurretAngle)');
+      const inner = cmds.map(c => `${IND_ARGS}${c}`).join(',\n');
+      return `.callback(() -> {\n${IND_CB}new SequentialCommandGroup(\n${inner}\n${IND_CB}).schedule();\n${IND_CHAIN}})`;
+
+    } else if (type === 'Aim Turret') {
+      const mode        = card.querySelector('.p-aim-mode')?.value || 'field_stored';
+      const customAngle = card.querySelector('.p-aim-angle')?.value || '0';
+      let cls, arg;
+      if      (mode === 'field_stored') { cls = 'TurnTurretToPosFieldCentricCommand'; arg = 'turretAngle';     }
+      else if (mode === 'field_custom') { cls = 'TurnTurretToPosFieldCentricCommand'; arg = customAngle;       }
+      else if (mode === 'robot_stored') { cls = 'TurnTurretToPosCommand';             arg = 'preAimTurretAngle'; }
+      else                              { cls = 'TurnTurretToPosCommand';             arg = customAngle;       }
+      return `.callback(() -> {\n${IND_CB}new ${cls}(${arg}).schedule();\n${IND_CHAIN}})`;
+    }
+    return null;
+  }
+
+  function regenerate() {
+    const rawName = document.getElementById('autoName').value || 'MyAuto';
+    const className = sanitize(rawName);
+    const key = getKey();
+    const pose = START_POSES[key];
+    const alliance = document.getElementById('alliance').value;
+    const veloL = document.getElementById('veloL').value;
+    const veloM = document.getElementById('veloM').value;
+    const veloR = document.getElementById('veloR').value;
+    const hoodL = document.getElementById('hoodL').value;
+    const hoodM = document.getElementById('hoodM').value;
+    const hoodR = document.getElementById('hoodR').value;
+    const turretAngle = document.getElementById('turretAngle').value;
+    const preAimAngle = document.getElementById('preAimAngle').value;
+
+    // Collect path segments from step cards
+    const cards = document.querySelectorAll('.step-card');
+    let usesAntiJam = false, usesSpit = false;
+    const segments = [];
+    cards.forEach(card => {
+      const type = card.querySelector('.step-type').value;
+      if (type === 'Shoot') {
+        if (card.querySelector('.p-antijam')?.checked) usesAntiJam = true;
+        if (card.querySelector('.p-spit')?.checked)    usesSpit    = true;
+      }
+      const seg = buildSegment(card);
+      if (seg) segments.push(seg);
+    });
+
+    // Build path chain inside inner class constructor
+    const pathBody = segments.length === 0
+      ? '            // No steps added yet — click "+ Add Step" above'
+      : '            this\n' + IND_CHAIN + segments.join('\n' + IND_CHAIN) + ';';
+
+    // Shooter velocity call
+    const veloCall = (veloL === veloM && veloM === veloR)
+      ? `shooter.shootWithVelocity(${veloL});`
+      : `shooter.shootWithVelocityIndependent(${veloL}, ${veloM}, ${veloR});`;
+
+    // Heading string (avoid ".0" for whole numbers)
+    const heading = pose.heading;
+    const headingStr = Number.isInteger(heading) ? heading.toFixed(1) : String(heading);
+
+    // Optional imports
+    const antiJamImport = usesAntiJam
+      ? 'import org.firstinspires.ftc.teamcode.blucru.common.commands.autonomousCommands.AutonomousShootAntiJamCommand;\n'
+      : '';
+    const spitImport = usesSpit
+      ? 'import org.firstinspires.ftc.teamcode.blucru.common.subsytems.intake.IntakeSpitCommand;\n'
+      : '';
+
+    const code =
+`package org.firstinspires.ftc.teamcode.blucru.opmodes.auto;
+
+import com.seattlesolvers.solverslib.command.SequentialCommandGroup;
+import com.seattlesolvers.solverslib.command.WaitCommand;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+
+import org.firstinspires.ftc.teamcode.blucru.common.commands.autonomousCommands.AutonomousShootCommand;
+${antiJamImport}${spitImport}import org.firstinspires.ftc.teamcode.blucru.common.commands.autonomousCommands.AutonomousTransferCommand;
+import org.firstinspires.ftc.teamcode.blucru.common.pathing.Path;
+import org.firstinspires.ftc.teamcode.blucru.common.pathing.SixWheelPIDPathBuilder;
+import org.firstinspires.ftc.teamcode.blucru.common.subsytems.outtake.shooter.shooterCommands.SetShooterVelocityIndependentCommand;
+import org.firstinspires.ftc.teamcode.blucru.common.subsytems.outtake.turret.turretCommands.TurnTurretToPosCommand;
+import org.firstinspires.ftc.teamcode.blucru.common.subsytems.outtake.turret.turretCommands.TurnTurretToPosFieldCentricCommand;
+import org.firstinspires.ftc.teamcode.blucru.common.util.Alliance;
+import org.firstinspires.ftc.teamcode.blucru.common.util.Globals;
+import org.firstinspires.ftc.teamcode.blucru.common.util.Point2d;
+import org.firstinspires.ftc.teamcode.blucru.common.util.Pose2d;
+import com.sfdev.assembly.state.StateMachine;
+import com.sfdev.assembly.state.StateMachineBuilder;
+
+@Autonomous
+public class Auto_${className} extends BaseAuto {
+    double turretAngle     = ${turretAngle};
+    double preAimTurretAngle = ${preAimAngle};
+    double velo            = ${veloL};
+    double veloMiddle      = ${veloM};
+    double leftHood        = ${hoodL};
+    double middleHood      = ${hoodM};
+    double rightHood       = ${hoodR};
+
+    enum State { RUNNING }
+
+    public class AutoPath extends SixWheelPIDPathBuilder {
+        public AutoPath() {
+            super();
+${pathBody}
+        }
+    }
+
+    Path currentPath;
+
+    @Override
+    public Pose2d getStartPose() {
+        return new Pose2d(${pose.x}, ${pose.y}, Math.toRadians(${headingStr}));
+    }
+
+    @Override
+    public StateMachine buildStateMachine() {
+        return new StateMachineBuilder()
+                .state(State.RUNNING)
+                .loop(() -> {
+                    if (currentPath != null) {
+                        currentPath.run();
+                    }
+                })
+                .build();
+    }
+
+    @Override
+    public void initialize() {
+        shooter.setHoodAngleIndependent(${hoodL}, ${hoodM}, ${hoodR});
+        shooter.write();
+        elevator.setMiddle();
+        elevator.write();
+        transfer.setAllMiddle();
+        transfer.write();
+        turret.resetEncoder();
+        turret.write();
+        sixWheel.reset();
+        sixWheel.write();
+        intake.resetEncoder();
+        intake.write();
+        super.initialize();
+    }
+
+    @Override
+    public void onStart() {
+        ${veloCall}
+        turret.setAngle(5);
+        sixWheel.setPosition(startPose);
+        currentPath = new AutoPath().build().start();
+        Globals.setAlliance(Alliance.${alliance});
+        sm.setState(State.RUNNING);
+        sm.start();
+    }
+
+    @Override
+    public void periodic() {
+        sm.update();
+    }
+}`;
+
+    const box = document.getElementById('output');
+    box.textContent = code;
+    Prism.highlightElement(box);
+  }
+
+  // ── Event wiring ───────────────────────────────────────────────────────────
+
+  document.getElementById('alliance').addEventListener('change', applyDefaults);
+  document.getElementById('startPos').addEventListener('change', applyDefaults);
+  document.getElementById('autoName').addEventListener('input', regenerate);
+  ['veloL','veloM','veloR','hoodL','hoodM','hoodR','turretAngle','preAimAngle'].forEach(id => {
+    document.getElementById(id).addEventListener('input', regenerate);
+  });
+  document.getElementById('copyBtn').addEventListener('click', () => {
+    navigator.clipboard.writeText(document.getElementById('output').textContent)
+      .then(() => alert('Copied to clipboard!'));
+  });
+
+  // Initial render
+  regenerate();
+</script>
+</body>
+</html>
