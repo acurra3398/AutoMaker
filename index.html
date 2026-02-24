@@ -321,6 +321,22 @@
 </div>
 
 <div class="section-box">
+  <div class="section-box-title">Shooter Calculator</div>
+  <p style="margin:2px 0 6px;font-size:12px;color:#9db2cc">Estimate velocity &amp; hood angle from shooting position to goal.</p>
+  <div class="params-grid">
+    <label>Goal X: <input type="number" id="goalX" value="0" style="width:80px"></label>
+    <label>Goal Y: <input type="number" id="goalY" value="0" style="width:80px"></label>
+    <label>Shoot X: <input type="number" id="calcShootX" style="width:80px"></label>
+    <label>Shoot Y: <input type="number" id="calcShootY" style="width:80px"></label>
+  </div>
+  <div id="calcResult" style="color:#9db2cc;font-size:13px;margin-top:8px;min-height:18px"></div>
+  <div style="display:flex;gap:8px;margin-top:6px">
+    <button onclick="runShooterCalc()">Calculate</button>
+    <button onclick="applyShooterCalc()" id="applyCalcBtn" style="display:none">Apply to Shooter</button>
+  </div>
+</div>
+
+<div class="section-box">
   <div class="section-box-title">Turret</div>
   <label>Shooting Angle — field-centric (degrees):
     <input type="number" id="turretAngle" value="142" style="width:100px">
@@ -355,6 +371,7 @@
       <div class="legend-item"><div class="legend-dot" style="background:#88c0d0"></div><span>Drive</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:#ebcb8b"></div><span>Turn</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:#bf616a"></div><span>⚡ Shoot</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#bf616a;border:2px dashed #fff"></div><span>⚡ Shoot on Move</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:#81a1c1"></div><span>⏸ Wait</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:#d08770"></div><span>↺ Transfer</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:#ebcb8b"></div><span>◎ Aim</span></div>
@@ -422,7 +439,7 @@
       { label: 'Wall Pickup',     x:  63, y: -62 },
     ],
     RED_CLOSE: [
-      { label: 'Start',           x: -49, y:  54 },
+      { label: 'Start',           x: -51, y:  54 },
       { label: 'Shooting Pos',    x: -16, y:  19, shootPreset: { veloL: 1120, veloM: 1140, veloR: 1120, hoodL: 34, hoodM: 34, hoodR: 34, turret: 218, preAim: 90 } },
       { label: 'Close Intake 1',  x: -16, y:  37 },
       { label: 'Close Intake 2',  x:  -5, y:  47 },
@@ -435,7 +452,8 @@
     RED_FAR: [
       { label: 'Start',           x:  63, y:   7 },
       { label: 'Shooting Pos',    x:  45, y:   9, shootPreset: { veloL: 1440, veloM: 1440, veloR: 1440, hoodL: 49, hoodM: 45, hoodR: 49, turret: 201, preAim: 116 } },
-      { label: 'Wing Intake 1',   x:  40, y:  48 },
+      { label: 'Wing Intake 1',   x:  37, y:  50 },
+      { label: 'Wing Intake 2',   x:  40, y:  40 },
       { label: 'Wall Approach',   x:  61, y:  45 },
       { label: 'Wall Pickup',     x:  63, y:  62 },
     ],
@@ -543,7 +561,7 @@
 
     const typeSelect = document.createElement('select');
     typeSelect.className = 'step-type';
-    ['Drive', 'Drive + Turn', 'Turn', 'Wait', 'Shoot', 'Transfer', 'Aim Turret', 'Intake'].forEach(t => {
+    ['Drive', 'Drive + Turn', 'Turn', 'Wait', 'Shoot', 'Shoot on Move', 'Transfer', 'Aim Turret', 'Intake'].forEach(t => {
       const o = document.createElement('option');
       o.value = t; o.textContent = t;
       typeSelect.appendChild(o);
@@ -742,6 +760,50 @@
       };
       div.querySelector('.p-intake-power').oninput = regenerate;
       container.appendChild(div);
+
+    } else if (type === 'Shoot on Move') {
+      // Shoot options
+      const shootDiv = document.createElement('div');
+      shootDiv.innerHTML = `
+        <div style="font-size:12px;color:#a3be8c;margin-bottom:6px">⚡ Fires shoot command, then robot drives concurrently</div>
+        <label>Shoot Mode:
+          <select class="p-som-mode">
+            <option value="all">Shoot All (<code>AutonomousShootCommand</code>)</option>
+            <option value="motif">Shoot in Motif Order (<code>AutonomousShootWithMotifCommand</code>)</option>
+          </select>
+        </label>
+        <label style="margin-top:4px"><input type="checkbox" class="p-som-antijam"> Use anti-jam variant</label>
+        <label style="margin-top:4px"><input type="checkbox" class="p-som-spit"> Spit intake after shoot (WaitCommand 300ms + IntakeSpitCommand)</label>`;
+      shootDiv.querySelector('.p-som-mode').onchange = regenerate;
+      shootDiv.querySelector('.p-som-antijam').onchange = regenerate;
+      shootDiv.querySelector('.p-som-spit').onchange = regenerate;
+      container.appendChild(shootDiv);
+
+      // Drive velocity
+      const veloRow = document.createElement('div');
+      veloRow.innerHTML = '<label style="margin-top:8px">Drive Max Velocity: <input type="number" class="p-velo" value="2000" style="width:100px"> <span style="color:#9db2cc;font-size:13px">(ticks/s)</span></label>';
+      veloRow.querySelector('.p-velo').oninput = regenerate;
+      container.appendChild(veloRow);
+
+      // Drive waypoints
+      const wpSection = document.createElement('div');
+      wpSection.style.marginTop = '10px';
+      const wpTitle = document.createElement('div');
+      wpTitle.style.cssText = 'font-size:13px;color:#c8d8ee;margin-bottom:4px';
+      wpTitle.textContent = 'Drive waypoints while shooting (in order):';
+      wpSection.appendChild(wpTitle);
+      const wpList = document.createElement('div');
+      wpList.className = 'waypoint-list';
+      wpSection.appendChild(wpList);
+      const addBtn = document.createElement('button');
+      addBtn.className = 'small';
+      addBtn.textContent = '+ Waypoint';
+      addBtn.style.marginTop = '6px';
+      addBtn.onclick = e => { e.preventDefault(); addWaypoint(wpList); regenerate(); };
+      wpSection.appendChild(addBtn);
+      container.appendChild(wpSection);
+      addWaypoint(wpList);
+      addWaypoint(wpList);
     }
   }
 
@@ -914,6 +976,38 @@
       const rawPower = parseFloat(card.querySelector('.p-intake-power')?.value || '0.7');
       const power = isNaN(rawPower) ? 0.7 : Math.max(-1, Math.min(1, rawPower));
       return `.callback(() -> {\n${IND_CB}new SetCustomIntakePowerCommand(${power.toFixed(2)}).schedule();\n${IND_CHAIN}})`;
+
+    } else if (type === 'Shoot on Move') {
+      const mode    = card.querySelector('.p-som-mode')?.value || 'all';
+      const antiJam = card.querySelector('.p-som-antijam')?.checked;
+      const spit    = card.querySelector('.p-som-spit')?.checked;
+      const velo    = card.querySelector('.p-velo')?.value || '2000';
+      const wpRows  = card.querySelectorAll('.waypoint-row');
+      if (wpRows.length === 0) return null;
+      const pts = Array.from(wpRows).map(r => {
+        const xUi = parseFloat(r.querySelector('.wp-x').value || '0');
+        const yUi = parseFloat(r.querySelector('.wp-y').value || '0');
+        const xVal = isNaN(xUi) ? 0 : fromUiX(xUi);
+        const yVal = isNaN(yUi) ? 0 : fromUiY(yUi);
+        return `${IND_CHAIN}        new Point2d(${xVal}, ${yVal})`;
+      });
+
+      let cmd;
+      if (mode === 'motif') {
+        cmd = antiJam ? 'new AutonomousShootWithMotifAntiJamCommand()' : 'new AutonomousShootWithMotifCommand()';
+      } else {
+        cmd = antiJam ? 'new AutonomousShootAntiJamCommand()' : 'new AutonomousShootCommand()';
+      }
+
+      let shootCallback;
+      if (spit) {
+        shootCallback = `.callback(() -> {\n${IND_CB}new SequentialCommandGroup(\n${IND_ARGS}${cmd},\n${IND_ARGS}new WaitCommand(300),\n${IND_ARGS}new IntakeSpitCommand()\n${IND_CB}).schedule();\n${IND_CHAIN}})`;
+      } else {
+        shootCallback = `.callback(() -> {\n${IND_CB}new SequentialCommandGroup(\n${IND_ARGS}${cmd}\n${IND_CB}).schedule();\n${IND_CHAIN}})`;
+      }
+
+      const driveCall = `.addPurePursuitPath(new Point2d[]{\n${pts.join(',\n')}\n${IND_CHAIN}}, ${velo})`;
+      return `${shootCallback}\n${IND_CHAIN}${driveCall}`;
     }
     return null;
   }
@@ -947,6 +1041,13 @@
         else if (mode === 'motif')       usesMotifShoot = true;
         else if (antiJam)                usesAntiJam = true;
         if (card.querySelector('.p-spit')?.checked) usesSpit = true;
+      } else if (type === 'Shoot on Move') {
+        const mode = card.querySelector('.p-som-mode')?.value || 'all';
+        const antiJam = !!card.querySelector('.p-som-antijam')?.checked;
+        if (mode === 'motif' && antiJam) usesMotifAntiJam = true;
+        else if (mode === 'motif')       usesMotifShoot = true;
+        else if (antiJam)                usesAntiJam = true;
+        if (card.querySelector('.p-som-spit')?.checked) usesSpit = true;
       } else if (type === 'Intake') {
         const mode = card.querySelector('.p-intake-mode')?.value || 'start';
         if (mode === 'start')  usesIntakeStart = true;
@@ -1208,6 +1309,9 @@ ${pathBody}
         pushHold(label, 300);
       } else if (type === 'Intake') {
         pushHold(label, 220);
+      } else if (type === 'Shoot on Move') {
+        // Shoot fires concurrently with drive; timeline only tracks drive motion
+        pushDrive(getDriveWaypoints(card), parseFloat(card.querySelector('.p-velo')?.value || '2000'), label);
       }
     });
 
@@ -1428,12 +1532,27 @@ ${pathBody}
     ctx.fillStyle = 'rgba(255,255,255,0.45)';
     ctx.font = '11px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('+y', W / 2, 14);
-    ctx.fillText('-y', W / 2, H - 6);
+    ctx.fillText('+y (72)', W / 2, 14);
+    ctx.fillText('-y (-72)', W / 2, H - 6);
     ctx.textAlign = 'left';
-    ctx.fillText('-x', 6, H / 2 - 4);
+    ctx.fillText('-x (-72)', 4, H / 2 - 4);
     ctx.textAlign = 'right';
-    ctx.fillText('+x', W - 6, H / 2 - 4);
+    ctx.fillText('+x (72)', W - 4, H / 2 - 4);
+    ctx.textAlign = 'left';
+
+    // Coordinate tick numbers at grid intersections (every 24 in)
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    ctx.font = '8px Arial';
+    ctx.textAlign = 'center';
+    for (let gv = -48; gv <= 48; gv += 24) {
+      if (gv === 0) continue;
+      const [xTick] = toC(gv, 0);
+      ctx.fillText(gv, xTick, H / 2 + 10);
+      const [, yTick] = toC(0, gv);
+      ctx.textAlign = 'left';
+      ctx.fillText(gv, W / 2 + 3, yTick + 3);
+      ctx.textAlign = 'center';
+    }
     ctx.textAlign = 'left';
 
     const key = getKey();
@@ -1450,6 +1569,24 @@ ${pathBody}
       ctx.font = '9px Arial';
       ctx.fillText(`${pt.label} (${toUiX(pt.x).toFixed(0)}, ${toUiY(pt.y).toFixed(0)})`, cx + 7, cy + 3);
     });
+
+    // ── Goal position (from calculator) ──
+    const gxEl = document.getElementById('goalX');
+    const gyEl = document.getElementById('goalY');
+    if (gxEl && gyEl) {
+      const gx = parseFloat(gxEl.value), gy = parseFloat(gyEl.value);
+      if (!isNaN(gx) && !isNaN(gy)) {
+        const [gcx, gcy] = toC(gx, gy);
+        ctx.shadowColor = '#f7c948'; ctx.shadowBlur = 12;
+        ctx.fillStyle = '#f7c948';
+        ctx.beginPath(); ctx.arc(gcx, gcy, 7, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(gcx, gcy, 7, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = 'rgba(247,201,72,0.8)'; ctx.font = '9px Arial';
+        ctx.fillText(`GOAL (${gx},${gy})`, gcx + 10, gcy + 3);
+      }
+    }
 
     // ── Start pose ──
     const pose = START_POSES[key];
@@ -1571,6 +1708,39 @@ ${pathBody}
         colorIdx++;
         samePosCnt = 0;
 
+      // ── Shoot on Move ──
+      } else if (type === 'Shoot on Move') {
+        const pts = getDriveWaypoints(card);
+        if (pts.length > 0) {
+          const allField = [[px, py], ...pts];
+          const allC = allField.map(([fx, fy]) => toC(fx, fy));
+
+          ctx.shadowColor = color; ctx.shadowBlur = 8;
+          ctx.strokeStyle = color; ctx.lineWidth = 3.5;
+          ctx.setLineDash([8, 4]); ctx.lineJoin = 'round'; // dashed to distinguish from plain Drive
+          drawPolyline(ctx, allC);
+          ctx.setLineDash([]); ctx.shadowBlur = 0;
+
+          // Arrow at end
+          const n = allC.length;
+          drawArrow(ctx, allC[n - 2], allC[n - 1], color);
+
+          // Shoot-while-moving marker at start position
+          drawActionMarker(ctx, allC[0][0], allC[0][1], '#bf616a', '⚡', i + 1, 'MOVE');
+
+          // Intermediate waypoint dots
+          pts.forEach(([fx, fy]) => {
+            const [cx2, cy2] = toC(fx, fy);
+            drawRobotBox(ctx, toC, fx, fy, 'rgba(255,255,255,0.40)', 'rgba(255,255,255,0.03)');
+            ctx.fillStyle = color; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.arc(cx2, cy2, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          });
+
+          px = pts[pts.length - 1][0]; py = pts[pts.length - 1][1];
+        }
+        colorIdx++;
+        samePosCnt = 0;
+
       // ── Action markers (Shoot, Wait, Transfer, Aim Turret) ──
       } else {
         const [cx, cy] = toC(px, py);
@@ -1672,6 +1842,84 @@ ${pathBody}
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   }
 
+  // ── Shooter Calculator ────────────────────────────────────────────────────
+
+  // Reference shoot positions and their presets (used for interpolation)
+  const CALC_REFS = {
+    BLUE: [
+      { pos: { x: -16, y: -19 }, velo: 1150, hood: 30 },
+      { pos: { x:  45, y:  -9 }, velo: 1440, hood: 49 }
+    ],
+    RED: [
+      { pos: { x: -16, y:  19 }, velo: 1120, hood: 34 },
+      { pos: { x:  45, y:   9 }, velo: 1440, hood: 49 }
+    ]
+  };
+
+  let calcSuggested = null;
+
+  function runShooterCalc() {
+    const goalX = parseFloat(document.getElementById('goalX').value);
+    const goalY = parseFloat(document.getElementById('goalY').value);
+    const sx    = parseFloat(document.getElementById('calcShootX').value);
+    const sy    = parseFloat(document.getElementById('calcShootY').value);
+
+    if (isNaN(sx) || isNaN(sy)) {
+      document.getElementById('calcResult').textContent = 'Enter shoot position X and Y.';
+      return;
+    }
+    if (isNaN(goalX) || isNaN(goalY)) {
+      document.getElementById('calcResult').textContent = 'Enter goal position X and Y.';
+      return;
+    }
+
+    const alliance = document.getElementById('alliance').value;
+    const refs = (CALC_REFS[alliance] || CALC_REFS.BLUE).map(r => ({
+      dist: Math.sqrt((r.pos.x - goalX) ** 2 + (r.pos.y - goalY) ** 2),
+      velo: r.velo,
+      hood: r.hood
+    })).sort((a, b) => a.dist - b.dist);
+
+    const targetDist = Math.sqrt((sx - goalX) ** 2 + (sy - goalY) ** 2);
+
+    let velo, hood;
+    if (targetDist <= refs[0].dist) {
+      velo = refs[0].velo; hood = refs[0].hood;
+    } else if (targetDist >= refs[refs.length - 1].dist) {
+      velo = refs[refs.length - 1].velo; hood = refs[refs.length - 1].hood;
+    } else {
+      for (let i = 0; i < refs.length - 1; i++) {
+        if (targetDist >= refs[i].dist && targetDist <= refs[i + 1].dist) {
+          const t = (targetDist - refs[i].dist) / (refs[i + 1].dist - refs[i].dist);
+          velo = Math.round(refs[i].velo + t * (refs[i + 1].velo - refs[i].velo));
+          hood = +(refs[i].hood + t * (refs[i + 1].hood - refs[i].hood)).toFixed(1);
+          break;
+        }
+      }
+    }
+
+    // Turret angle to point at goal (field-centric)
+    const dx = goalX - sx, dy = goalY - sy;
+    const turret = Math.round(headingFromVector(dx, dy));
+
+    calcSuggested = { velo, hood, turret, dist: targetDist };
+    document.getElementById('calcResult').innerHTML =
+      `Dist: <b>${targetDist.toFixed(1)} in</b> &rarr; Velo: <b>${velo} RPM</b>, Hood: <b>${hood}&deg;</b>, Turret: <b>${turret}&deg;</b>`;
+    document.getElementById('applyCalcBtn').style.display = 'inline-block';
+  }
+
+  function applyShooterCalc() {
+    if (!calcSuggested) { runShooterCalc(); return; }
+    document.getElementById('veloL').value = calcSuggested.velo;
+    document.getElementById('veloM').value = calcSuggested.velo;
+    document.getElementById('veloR').value = calcSuggested.velo;
+    document.getElementById('hoodL').value = calcSuggested.hood;
+    document.getElementById('hoodM').value = calcSuggested.hood;
+    document.getElementById('hoodR').value = calcSuggested.hood;
+    document.getElementById('turretAngle').value = calcSuggested.turret;
+    regenerate();
+  }
+
   // ── Event wiring ───────────────────────────────────────────────────────────
 
   document.getElementById('alliance').addEventListener('change', applyDefaults);
@@ -1680,6 +1928,8 @@ ${pathBody}
   ['veloL','veloM','veloR','hoodL','hoodM','hoodR','turretAngle','preAimAngle'].forEach(id => {
     document.getElementById(id).addEventListener('input', regenerate);
   });
+  document.getElementById('goalX').addEventListener('input', renderField);
+  document.getElementById('goalY').addEventListener('input', renderField);
   document.getElementById('copyBtn').addEventListener('click', () => {
     navigator.clipboard.writeText(document.getElementById('output').textContent)
       .then(() => alert('Copied to clipboard!'));
