@@ -298,8 +298,14 @@
     <select id="startPos">
       <option value="CLOSE">Close</option>
       <option value="FAR">Far</option>
+      <option value="CUSTOM">Custom</option>
     </select>
   </label>
+</div>
+<div id="customPoseRow" class="field-row" style="display:none; margin-top:8px; flex-wrap:wrap; gap:8px;">
+  <label>Start X: <input type="number" id="customStartX" placeholder="e.g. -51" style="width:80px"></label>
+  <label>Start Y: <input type="number" id="customStartY" placeholder="e.g. -54" style="width:80px"></label>
+  <label>Heading (°): <input type="number" id="customStartH" placeholder="e.g. 51.5" style="width:90px"></label>
 </div>
 
 <div class="section-box">
@@ -420,42 +426,52 @@
 
   const KNOWN_POINTS = {
     BLUE_CLOSE: [
-      { label: 'Start',           x: -51, y: -54 },
-      { label: 'Shooting Pos',    x: -16, y: -19, shootPreset: { veloL: 1150, veloM: 1150, veloR: 1150, hoodL: 30, hoodM: 30, hoodR: 30, turret: 142, preAim: -90 } },
-      { label: 'Close Intake 1',  x: -16, y: -37 },
-      { label: 'Close Intake 2',  x:  -5, y: -47 },
-      { label: 'Close Intake 3',  x:  -5, y: -60 },
-      { label: 'Gate Intake',     x:  13, y: -49 },
-      { label: 'Gate Sweep',      x:  17, y: -51 },
-      { label: 'Far Gate Intake', x:  36, y: -45 },
-      { label: 'Cycle Mid',       x:  10, y: -30 },
+      { label: 'Start',              x: -51, y: -54 },
+      { label: 'Shooting Pos',       x: -16, y: -19, shootPreset: { veloL: 1150, veloM: 1150, veloR: 1150, hoodL: 30, hoodM: 30, hoodR: 30, turret: 142, preAim: -90 } },
+      { label: 'Close Intake 1',     x: -16, y: -37 },
+      { label: 'Close Intake 2',     x:  -5, y: -47 },
+      { label: 'Close Intake 3',     x:  -5, y: -60 },
+      { label: 'Gate Sweep',         x:  17, y: -51 },
+      { label: 'Gate Intake',        x:  13, y: -49 },
+      { label: 'Cycle Mid',          x:  10, y: -30 },
+      { label: 'Far Gate Intake',    x:  36, y: -45 },
+      { label: 'Cycle Wall Pickup',  x:  12, y: -59 },
+      { label: 'Close Cycle Pickup', x:  -8, y: -49 },
+      { label: 'Gate Steal 1',       x:  19, y: -45 },
+      { label: 'Gate Steal 2',       x:  14, y: -58 },
     ],
     BLUE_FAR: [
-      { label: 'Start',           x:  63, y:  -7 },
-      { label: 'Shooting Pos',    x:  45, y:  -9, shootPreset: { veloL: 1440, veloM: 1440, veloR: 1430, hoodL: 49, hoodM: 45, hoodR: 49, turret: 156, preAim: -116 } },
-      { label: 'Wing Intake 1',   x:  37, y: -50 },
-      { label: 'Wing Intake 2',   x:  40, y: -40 },
-      { label: 'Wall Approach',   x:  61, y: -45 },
-      { label: 'Wall Pickup',     x:  63, y: -62 },
+      { label: 'Start',          x:  63, y:  -7 },
+      { label: 'Shooting Pos',   x:  45, y:  -9, shootPreset: { veloL: 1440, veloM: 1440, veloR: 1430, hoodL: 49, hoodM: 45, hoodR: 49, turret: 156, preAim: -116 } },
+      { label: 'Wing Intake 1',  x:  37, y: -50 },
+      { label: 'Wing Intake 2',  x:  40, y: -40 },
+      { label: 'Wall Approach',  x:  61, y: -45 },
+      { label: 'Wall Mid',       x:  63, y: -55 },
+      { label: 'Wall Pickup',    x:  63, y: -62 },
     ],
     RED_CLOSE: [
-      { label: 'Start',           x: -51, y:  54 },
-      { label: 'Shooting Pos',    x: -16, y:  19, shootPreset: { veloL: 1120, veloM: 1140, veloR: 1120, hoodL: 34, hoodM: 34, hoodR: 34, turret: 218, preAim: 90 } },
-      { label: 'Close Intake 1',  x: -16, y:  37 },
-      { label: 'Close Intake 2',  x:  -5, y:  47 },
-      { label: 'Close Intake 3',  x:  -5, y:  60 },
-      { label: 'Gate Intake',     x:  13, y:  49 },
-      { label: 'Gate Sweep',      x:  17, y:  51 },
-      { label: 'Far Gate Intake', x:  36, y:  45 },
-      { label: 'Cycle Mid',       x:  10, y:  30 },
+      { label: 'Start',              x: -51, y:  54 },
+      { label: 'Shooting Pos',       x: -16, y:  19, shootPreset: { veloL: 1120, veloM: 1140, veloR: 1120, hoodL: 34, hoodM: 34, hoodR: 34, turret: 218, preAim: 90 } },
+      { label: 'Close Intake 1',     x: -14, y:  35 },
+      { label: 'Close Intake 2',     x:  -5, y:  47 },
+      { label: 'Close Intake 3',     x:  -5, y:  60 },
+      { label: 'Gate Sweep',         x:  15, y:  49 },
+      { label: 'Gate Intake',        x:  13, y:  49 },
+      { label: 'Cycle Mid',          x:  10, y:  30 },
+      { label: 'Far Gate Intake',    x:  36, y:  50 },
+      { label: 'Cycle Wall Pickup',  x:  12, y:  59 },
+      { label: 'Close Cycle Pickup', x:  -8, y:  49 },
+      { label: 'Gate Steal 1',       x:  19, y:  45 },
+      { label: 'Gate Steal 2',       x:  14, y:  58 },
     ],
     RED_FAR: [
-      { label: 'Start',           x:  63, y:   7 },
-      { label: 'Shooting Pos',    x:  45, y:   9, shootPreset: { veloL: 1440, veloM: 1440, veloR: 1440, hoodL: 49, hoodM: 45, hoodR: 49, turret: 201, preAim: 116 } },
-      { label: 'Wing Intake 1',   x:  37, y:  50 },
-      { label: 'Wing Intake 2',   x:  40, y:  40 },
-      { label: 'Wall Approach',   x:  61, y:  45 },
-      { label: 'Wall Pickup',     x:  63, y:  62 },
+      { label: 'Start',          x:  63, y:   7 },
+      { label: 'Shooting Pos',   x:  45, y:   9, shootPreset: { veloL: 1440, veloM: 1440, veloR: 1440, hoodL: 49, hoodM: 45, hoodR: 49, turret: 201, preAim: 116 } },
+      { label: 'Wing Intake 1',  x:  40, y:  50 },
+      { label: 'Wing Intake 2',  x:  40, y:  48 },
+      { label: 'Wall Approach',  x:  61, y:  45 },
+      { label: 'Wall Mid',       x:  63, y:  55 },
+      { label: 'Wall Pickup',    x:  63, y:  62 },
     ],
   };
 
@@ -482,6 +498,16 @@
 
   function getKey() {
     return document.getElementById('alliance').value + '_' + document.getElementById('startPos').value;
+  }
+
+  function getActivePose() {
+    if (document.getElementById('startPos').value === 'CUSTOM') {
+      const x = parseFloat(document.getElementById('customStartX').value);
+      const y = parseFloat(document.getElementById('customStartY').value);
+      const h = parseFloat(document.getElementById('customStartH').value);
+      return { x: isNaN(x) ? 0 : x, y: isNaN(y) ? 0 : y, heading: isNaN(h) ? 0 : h };
+    }
+    return START_POSES[getKey()] || { x: 0, y: 0, heading: 0 };
   }
 
   function sanitize(raw) {
@@ -529,8 +555,10 @@
   }
 
   function applyDefaults() {
+    const isCustom = document.getElementById('startPos').value === 'CUSTOM';
+    document.getElementById('customPoseRow').style.display = isCustom ? 'flex' : 'none';
     const d = DEFAULTS[getKey()];
-    if (!d) return;
+    if (!d) { repopulateAllPickers(); regenerate(); return; }
     document.getElementById('veloL').value = d.veloL;
     document.getElementById('veloM').value = d.veloM;
     document.getElementById('veloR').value = d.veloR;
@@ -1016,7 +1044,7 @@
     const rawName = document.getElementById('autoName').value || 'MyAuto';
     const className = sanitize(rawName);
     const key = getKey();
-    const pose = START_POSES[key];
+    const pose = getActivePose();
     const alliance = document.getElementById('alliance').value;
     const veloL = document.getElementById('veloL').value;
     const veloM = document.getElementById('veloM').value;
@@ -1220,7 +1248,7 @@ ${pathBody}
 
   function buildMotionTimeline() {
     const key = getKey();
-    const pose = START_POSES[key];
+    const pose = getActivePose();
     let px = pose.x, py = pose.y, heading = pose.heading;
     let tMs = 0;
     const segs = [];
@@ -1352,7 +1380,7 @@ ${pathBody}
 
   function getPlaybackPoseAt(tMs) {
     const key = getKey();
-    const pose = START_POSES[key];
+    const pose = getActivePose();
     if (!playback.segments.length) return { x: pose.x, y: pose.y, heading: pose.heading, label: 'Start' };
 
     const t = Math.max(0, Math.min(playback.durationMs, tMs));
@@ -1589,7 +1617,7 @@ ${pathBody}
     }
 
     // ── Start pose ──
-    const pose = START_POSES[key];
+    const pose = getActivePose();
     let px = pose.x, py = pose.y;
     {
       const [cx, cy] = toC(px, py);
@@ -1924,6 +1952,9 @@ ${pathBody}
 
   document.getElementById('alliance').addEventListener('change', applyDefaults);
   document.getElementById('startPos').addEventListener('change', applyDefaults);
+  ['customStartX','customStartY','customStartH'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => { regenerate(); renderField(); });
+  });
   document.getElementById('autoName').addEventListener('input', regenerate);
   ['veloL','veloM','veloR','hoodL','hoodM','hoodR','turretAngle','preAimAngle'].forEach(id => {
     document.getElementById(id).addEventListener('input', regenerate);
